@@ -1,0 +1,37 @@
+:root {
+  // --primary: #2c3e50;
+  --primary: #242038;
+  --secondary: #c9c9c9;
+  --warn-light: #fffac2;
+  --tertiary: #42b983;
+  --small-screen: 768px;
+}
+
+body {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+//   font-family: "Raleway", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  // background-color: #0F1624;
+  background-color: var(--primary);
+  color: var(--secondary);
+  // color: #42b983;
+}
+
+.nav-link {
+  color: var(--secondary);
+  &:hover {
+    font-weight: bold;
+    color: var(--secondary);
+    color: white;
+  }
+}
+
+.btn:focus,
+.nav-link:focus,
+.nav-link:focus-visible,
+a:focus {
+  outline: var(--tertiary);
+  box-shadow: 0 0 0 0.25rem var(--tertiary);
+  color: var(--tertiary);
+}
