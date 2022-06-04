@@ -8,7 +8,13 @@
             <span class="top-info__main-text">Warren Scantlebury</span> <br />
             <span>welcome to my hub</span>
           </div>
-          <button class="btn btn-lg">Download CV</button>
+          <a
+            href="/Warren-Scantlebury-CV.pdf"
+            class="btn btn-lg"
+            download=""
+            target="_blank"
+            >Download CV</a
+          >
         </div>
         <img
           class="top-info__right portrait"
@@ -24,10 +30,15 @@
         </header>
         <div class="my-work__projects">
           <div class="card" style="width: 18rem">
-            <img src="/images/chat-as.png" class="card-img-top" alt="" />
+            <img
+              src="/illustrations/chatting.svg"
+              style="background: white; padding: 0.5rem"
+              class="card-img-top"
+              alt=""
+            />
             <div class="card-body">
               <h5 class="card-title">Web Chat</h5>
-              <p class="card-text text-center">
+              <p class="card-text">
                 Web chat is a fully featured chat PWA that allows users to chat
                 with friends online, watch YouTube videos together and so much
                 more!
@@ -124,8 +135,7 @@ export default class HomeView extends Vue {}
 
   &__text {
     flex-basis: 100%;
-    font-family: "Raleway", sans-serif;
-    font-weight: 900;
+    // font-weight: 900;
     margin: 1rem 0rem;
     animation: fadeIn 0.5s ease-in 0s;
     animation-direction: normal;
@@ -135,6 +145,7 @@ export default class HomeView extends Vue {}
     line-height: 1.2;
   }
   &__main-text {
+    font-family: "Raleway", sans-serif;
     font-size: calc(1.525rem + 3.3vw);
     // font-weight: 300;
     line-height: 1.2;

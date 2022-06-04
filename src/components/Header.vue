@@ -1,10 +1,13 @@
 <template>
-  <header class="app-header">
-    <div class="container">
-      <div class="scant-io">Scantlebury.io</div>
-      <div
-        class="d-flex flex-wrap align-items-flex-end justify-content-center justify-content-lg-start"
-      >
+  <header class="app-header primary-polkadot-bg">
+    <div class="app-header__container container">
+      <a class="app-header__logo" href="/">
+        <img
+          src="/WS_white.png"
+          alt="Warren Scantlebury logo"
+        /><!--  Scantlebury.io -->
+      </a>
+      <div class="app-header__links">
         <ul
           class="nav col-12 col-lg-auto my-2 justify-content-center my-md-0 text-small"
         >
@@ -62,7 +65,7 @@
               Github
             </a>
           </li>
-          <li>
+          <!-- <li>
             <a href="https://github.com/warren488" class="nav-link">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -78,7 +81,7 @@
               </svg>
               Email
             </a>
-          </li>
+          </li> -->
         </ul>
       </div>
     </div>
@@ -93,9 +96,14 @@ export default class Header extends Vue {}
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped lang="scss">
-.scant-io {
+.app-header__logo {
   align-self: flex-end;
   font-size: 32px;
+  padding-bottom: 0.25rem;
+  img {
+    width: 50px;
+    aspect-ratio: 1;
+  }
 }
 
 .nav-link {
@@ -104,19 +112,30 @@ export default class Header extends Vue {}
 
 .app-header {
   background-color: var(--primary);
-  .container {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    border-bottom: solid thin var(--secondary);
-    @media (max-width: 576px) {
-      justify-content: center;
-      .scant-io {
-        display: none;
-        flex-basis: 100%;
-        text-align: center;
-      }
-    }
+}
+.app-header__container {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  border-bottom: solid thin var(--secondary);
+}
+
+.app-header__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  // justify-content-lg-start
+}
+
+@media (max-width: 576px) {
+  .app-header__container {
+    justify-content: center;
+  }
+  .app-header__logo {
+    display: none;
+    flex-basis: 100%;
+    text-align: center;
   }
 }
 </style>
