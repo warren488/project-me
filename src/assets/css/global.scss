@@ -1,6 +1,7 @@
 :root {
-  // --primary: #2c3e50;
   --primary: #242038;
+  --primary: #302956;
+  --primary: #2c3e50;
   --secondary: #c9c9c9;
   --warn-light: #fffac2;
   --tertiary: #42b983;
@@ -8,30 +9,41 @@
 }
 
 .primary-polkadot-bg {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 10%, var(--primary) 45%);
-  background-position: 0 0 ;
-  background-size: 35px 35px; 
+  background-image: radial-gradient(
+    var(--secondary) 3%,
+    var(--primary) 5%
+  );
+  background-position: 0 0;
+  background-size: 15px 15px;
+  background-color: var(--primary);
 }
-
 body {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   font-family: "Raleway", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--primary);
-  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 15%, var(--primary) 45%);
-  background-position: 0 0 ;
-  background-size: 35px 35px;
   color: var(--secondary);
-  // color: #42b983;
 }
 
 .nav-link {
   color: var(--secondary);
   &:hover {
-    // font-weight: bold;
-    filter: drop-shadow(0px 0px 3px var(--secondary));
-    color: white;
+    filter: drop-shadow(0px 0px 3px);
+    color: var(--secondary);
+  }
+}
+
+.btn {
+  color: var(--tertiary);
+  border: solid 2px var(--tertiary);
+  border-radius: 0.5rem;
+  // text-decoration: underline;
+  font-weight: bold;
+  // background-color: var(--tertiary);
+  &:hover {
+    color: var(--primary);
+    background-color: var(--tertiary);
+    box-shadow: 0px 0px 5px 2px var(--tertiary);
   }
 }
 
@@ -42,4 +54,19 @@ a:focus {
   outline: var(--tertiary);
   box-shadow: 0 0 0 0.25rem var(--tertiary);
   color: var(--tertiary);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    // --primary: #2c3e50;
+    --secondary: #2c3e50;
+    --primary: #c9c9c9;
+    --primary: white;
+    --warn-light: #a89e30;
+    --tertiary: #42b983;
+    --small-screen: 768px;
+  }
+  .primary-polkadot-bg {
+    // background-image: initial;
+  }
 }

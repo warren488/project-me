@@ -2,15 +2,68 @@
   <header class="app-header primary-polkadot-bg">
     <div class="app-header__container container">
       <a class="app-header__logo" href="/">
-        <img
+        <!-- <img
+          class="app-header__image"
           src="/WS_white.png"
           alt="Warren Scantlebury logo"
-        /><!--  Scantlebury.io -->
-      </a>
-      <div class="app-header__links">
-        <ul
-          class="nav col-12 col-lg-auto my-2 justify-content-center my-md-0 text-small"
+        /> -->
+        <svg
+          class="app-header__image"
+          version="1.1"
+          viewBox="0.0 0.0 960.0 720.0"
+          fill="none"
+          stroke="none"
+          stroke-linecap="square"
+          stroke-miterlimit="10"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+          xmlns="http://www.w3.org/2000/svg"
         >
+          <clipPath id="p.0">
+            <path
+              d="m0 0l960.0 0l0 720.0l-960.0 0l0 -720.0z"
+              clip-rule="nonzero"
+            />
+          </clipPath>
+          <g clip-path="url(#p.0)">
+            <path
+              fill="currentColor"
+              fill-opacity="0.0"
+              d="m0 0l960.0 0l0 720.0l-960.0 0z"
+              fill-rule="evenodd"
+            />
+            <path
+              fill="currentColor"
+              fill-opacity="0.0"
+              d="m0 693.3746c103.17983 -185.86133 169.54166 -387.6846 226.8323 -588.98016c42.894928 -150.7149 -183.97818 317.59485 -106.73468 456.75818c58.738052 105.82361 128.08733 -206.68579 186.8068 -312.51776c16.032959 -28.896667 -10.0954895 63.99434 -13.341827 96.16664c-9.476868 93.91876 -24.187408 229.6735 66.70917 276.46237c31.139282 16.02887 73.516174 -21.213745 93.41397 -48.092834c92.1297 -124.45413 66.70917 -295.13324 66.70917 -444.72067c0 -32.055542 -25.162567 -118.83331 0 -96.166626"
+              fill-rule="evenodd"
+            />
+            <path
+              stroke="currentColor"
+              stroke-width="40.0"
+              stroke-linejoin="round"
+              stroke-linecap="butt"
+              d="m0 693.3746c103.17983 -185.86133 169.54166 -387.6846 226.8323 -588.98016c42.894928 -150.7149 -183.97818 317.59485 -106.73468 456.75818c58.738052 105.82361 128.08733 -206.68579 186.8068 -312.51776c16.032959 -28.896667 -10.0954895 63.99434 -13.341827 96.16664c-9.476868 93.91876 -24.187408 229.6735 66.70917 276.46237c31.139282 16.02887 73.516174 -21.213745 93.41397 -48.092834c92.1297 -124.45413 66.70917 -295.13324 66.70917 -444.72067c0 -32.055542 -25.162567 -118.83331 0 -96.166626"
+              fill-rule="evenodd"
+            />
+            <path
+              fill="currentColor"
+              fill-opacity="0.0"
+              d="m370.0394 761.2823c132.92691 -229.41852 324.99313 -459.56476 324.99313 -709.1647c0 -21.66657 -34.93091 14.463718 -32.496765 36.055347c14.434692 128.03864 24.47638 127.491165 65.019226 252.42549c22.896545 70.55664 86.922 155.98181 32.496704 216.3511c-48.176514 53.43811 -308.19373 65.447876 -259.99963 12.018494"
+              fill-rule="evenodd"
+            />
+            <path
+              stroke="currentColor"
+              stroke-width="40.0"
+              stroke-linejoin="round"
+              stroke-linecap="butt"
+              d="m370.0394 761.2823c132.92691 -229.41852 324.99313 -459.56476 324.99313 -709.1647c0 -21.66657 -34.93091 14.463718 -32.496765 36.055347c14.434692 128.03864 24.47638 127.491165 65.019226 252.42549c22.896545 70.55664 86.922 155.98181 32.496704 216.3511c-48.176514 53.43811 -308.19373 65.447876 -259.99963 12.018494"
+              fill-rule="evenodd"
+            />
+          </g>
+        </svg>
+      </a>
+      <nav>
+        <ul class="app-header__links">
           <li>
             <a href="https://twitter.com/warrendadev" class="nav-link">
               <svg
@@ -66,24 +119,24 @@
             </a>
           </li>
           <!-- <li>
-            <a href="https://github.com/warren488" class="nav-link">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                fill="currentColor"
-                class="bi d-block mx-auto mb-1 bi-envelope-fill"
-                viewBox="0 0 16 16"
-              >
-                <path
-                  d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.436-.586L16 11.801V4.697l-5.803 3.546z"
-                />
-              </svg>
-              Email
-            </a>
-          </li> -->
+              <a href="https://github.com/warren488" class="nav-link">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  fill="currentColor"
+                  class="bi d-block mx-auto mb-1 bi-envelope-fill"
+                  viewBox="0 0 16 16"
+                >
+                  <path
+                    d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.436-.586L16 11.801V4.697l-5.803 3.546z"
+                  />
+                </svg>
+                Email
+              </a>
+            </li> -->
         </ul>
-      </div>
+      </nav>
     </div>
   </header>
 </template>
@@ -100,14 +153,14 @@ export default class Header extends Vue {}
   align-self: flex-end;
   font-size: 32px;
   padding-bottom: 0.25rem;
-  img {
+  filter: drop-shadow(0px 0px 3px var(--secondary));
+
+  .app-header__image,
+  svg {
+    color: var(--secondary);
     width: 50px;
     aspect-ratio: 1;
   }
-}
-
-.nav-link {
-  padding-bottom: 0px;
 }
 
 .app-header {
@@ -125,7 +178,14 @@ export default class Header extends Vue {}
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: center;
+  list-style: none;
+  padding: 0px;
+  margin: 0;
   // justify-content-lg-start
+}
+
+.nav-link {
+  padding-bottom: 0px;
 }
 
 @media (max-width: 576px) {
@@ -133,9 +193,10 @@ export default class Header extends Vue {}
     justify-content: center;
   }
   .app-header__logo {
-    display: none;
+    // display: none;
     flex-basis: 100%;
     text-align: center;
+    padding-bottom: 0px;
   }
 }
 </style>
