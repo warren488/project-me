@@ -26,18 +26,7 @@
           </clipPath>
           <g clip-path="url(#p.0)">
             <path
-              fill="currentColor"
-              fill-opacity="0.0"
-              d="m0 0l960.0 0l0 720.0l-960.0 0z"
-              fill-rule="evenodd"
-            />
-            <path
-              fill="currentColor"
-              fill-opacity="0.0"
-              d="m0 693.3746c103.17983 -185.86133 169.54166 -387.6846 226.8323 -588.98016c42.894928 -150.7149 -183.97818 317.59485 -106.73468 456.75818c58.738052 105.82361 128.08733 -206.68579 186.8068 -312.51776c16.032959 -28.896667 -10.0954895 63.99434 -13.341827 96.16664c-9.476868 93.91876 -24.187408 229.6735 66.70917 276.46237c31.139282 16.02887 73.516174 -21.213745 93.41397 -48.092834c92.1297 -124.45413 66.70917 -295.13324 66.70917 -444.72067c0 -32.055542 -25.162567 -118.83331 0 -96.166626"
-              fill-rule="evenodd"
-            />
-            <path
+              class="path w-path"
               stroke="currentColor"
               stroke-width="40.0"
               stroke-linejoin="round"
@@ -46,12 +35,7 @@
               fill-rule="evenodd"
             />
             <path
-              fill="currentColor"
-              fill-opacity="0.0"
-              d="m370.0394 761.2823c132.92691 -229.41852 324.99313 -459.56476 324.99313 -709.1647c0 -21.66657 -34.93091 14.463718 -32.496765 36.055347c14.434692 128.03864 24.47638 127.491165 65.019226 252.42549c22.896545 70.55664 86.922 155.98181 32.496704 216.3511c-48.176514 53.43811 -308.19373 65.447876 -259.99963 12.018494"
-              fill-rule="evenodd"
-            />
-            <path
+              class="path s-path"
               stroke="currentColor"
               stroke-width="40.0"
               stroke-linejoin="round"
@@ -149,6 +133,27 @@ export default class Header extends Vue {}
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped lang="scss">
+.w-path {
+  stroke-dasharray: 2682;
+  stroke-dashoffset: 2682;
+}
+.s-path {
+  stroke-dasharray: 1660;
+  stroke-dashoffset: 1660;
+}
+.w-path {
+  animation: dash 0.4s linear forwards;
+}
+.s-path {
+  animation: dash 0.4s linear forwards 0.4s;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 .app-header__logo {
   align-self: flex-end;
   font-size: 32px;
