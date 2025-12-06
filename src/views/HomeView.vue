@@ -8,13 +8,7 @@
             <span class="top-info__main-text">Warren Scantlebury</span> <br />
             <span>welcome to my hub</span>
           </div>
-          <a
-            href="/Warren-Scantlebury-CV.pdf"
-            class="btn btn-lg"
-            download=""
-            target="_blank"
-            >Download CV</a
-          >
+          <a href="/my-experience" class="btn btn-lg">View CV</a>
         </div>
         <img
           class="top-info__right portrait"

@@ -1,7 +1,7 @@
 <template>
   <Header class="fixed-top"></Header>
   <!-- i dont know if this is good practice but this allows use to act like the header is in the dom and not sticky -->
-  <Header></Header>
+  <!-- <Header></Header> -->
   <main class="app-container">
     <div
       class="alert alert-warning d-inline-flex align-items-center mx-auto mb-4 text-center flex-wrap"

@@ -56,17 +56,17 @@ a:focus {
   color: var(--tertiary);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    // --primary: #2c3e50;
-    --secondary: #2c3e50;
-    --primary: #c9c9c9;
-    --primary: white;
-    --warn-light: #a89e30;
-    --tertiary: #42b983;
-    --small-screen: 768px;
-  }
-  .primary-polkadot-bg {
-    // background-image: initial;
-  }
-}
+// @media (prefers-color-scheme: light) {
+//   :root {
+//     // --primary: #2c3e50;
+//     --secondary: #2c3e50;
+//     --primary: #c9c9c9;
+//     --primary: white;
+//     --warn-light: #a89e30;
+//     --tertiary: #42b983;
+//     --small-screen: 768px;
+//   }
+//   .primary-polkadot-bg {
+//     // background-image: initial;
+//   }
+// }
