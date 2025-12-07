@@ -52,7 +52,7 @@ const formatPhone = (p: string) => p.replace(/\s/g, "");
           </div>
 
           <div class="sidebar-section" v-if="page.competencies">
-            <div class="sidebar-title">Methodologies</div>
+            <div class="sidebar-title">Notable Competencies</div>
             <div class="pill-container">
               <span
                 v-for="(comp, index) in page.competencies"
@@ -271,8 +271,7 @@ const formatPhone = (p: string) => p.replace(/\s/g, "");
   letter-spacing: 1px;
   font-size: 0.85rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding-bottom: var(--space-sm);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   color: var(--color-text-sidebar-muted);
 }
 

@@ -79,6 +79,7 @@ export const cvData: CVData = {
     "Agile & Scrum",
     "CI/CD Pipelines",
     "TDD",
+    "JIRA",
     "Microservices Architecture",
     "Junior Mentorship",
   ],
