@@ -1,0 +1,45 @@
+{
+  "id": "full",
+  "name": "Full CV",
+  "title": "Full Stack Software Engineer",
+  "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives.",
+  "pages": [
+    {
+      "education": ["edu-msc-nottingham", "edu-bsc-uwi"],
+      "competencies": [
+        "comp-agile",
+        "comp-cicd",
+        "comp-tdd",
+        "comp-jira",
+        "comp-microservices",
+        "comp-mentorship"
+      ],
+      "achievements": ["ach-startup-weekend", "ach-research-paper"],
+      "skills": [
+        "skill-typescript",
+        "skill-javascript",
+        "skill-react",
+        "skill-nextjs",
+        "skill-vue",
+        "skill-tailwind",
+        "skill-node",
+        "skill-express",
+        "skill-rest",
+        "skill-graphql",
+        "skill-gcp",
+        "skill-lambda",
+        "skill-kubernetes",
+        "skill-terraform",
+        "skill-gitops",
+        "skill-kafka",
+        "skill-sql"
+      ],
+      "experience": ["job-rad", "job-smartterm", "job-smartmatic"]
+    },
+    {
+      "experience": ["job-hyuna"],
+      "interests": ["int-hardware", "int-cricket", "int-pwa-research"],
+      "projects": ["proj-chat-pwa", "proj-dominoes"]
+    }
+  ]
+}

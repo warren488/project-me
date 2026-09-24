@@ -1,0 +1,196 @@
+{
+  "profile": {
+    "name": "Warren Scantlebury",
+    "location": "Bridgetown, Barbados",
+    "phone": "+44 7591 075672",
+    "email": "warren.scantlebury@gmail.com",
+    "website": "warren.scantlebury.io"
+  },
+  "entries": [
+    {
+      "id": "job-rad",
+      "kind": "job",
+      "title": "Software Engineering Consultant",
+      "org": "The RAD Consulting Group",
+      "start": "2022-10",
+      "end": null,
+      "tags": ["fullstack", "devops"],
+      "bullets": [
+        {
+          "id": "rad-fullstack",
+          "text": "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
+          "tags": ["fullstack", "frontend", "backend"]
+        },
+        {
+          "id": "rad-gcp",
+          "text": "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing <strong>GitOps</strong> workflows.",
+          "tags": ["devops"]
+        },
+        {
+          "id": "rad-k8s",
+          "text": "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>.",
+          "tags": ["devops", "backend"]
+        }
+      ]
+    },
+    {
+      "id": "job-smartterm",
+      "kind": "job",
+      "title": "Software Engineer",
+      "org": "Smartterm Ltd",
+      "start": "2021-01",
+      "end": "2021-06",
+      "tags": ["frontend"],
+      "bullets": [
+        {
+          "id": "smartterm-agile",
+          "text": "Developed high-performance educational platforms using Agile methodologies.",
+          "tags": []
+        },
+        {
+          "id": "smartterm-video",
+          "text": "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito.",
+          "tags": ["frontend", "aws"]
+        }
+      ]
+    },
+    {
+      "id": "job-smartmatic",
+      "kind": "job",
+      "title": "Software Engineer",
+      "org": "Smartmatic International",
+      "start": "2019-09",
+      "end": "2020-12",
+      "tags": ["frontend"],
+      "bullets": [
+        {
+          "id": "smartmatic-lead",
+          "text": "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
+          "tags": ["frontend", "leadership"]
+        },
+        {
+          "id": "smartmatic-design-system",
+          "text": "Co-developed a company-wide Design System focused on Accessibility using <strong>Web Components</strong> and Vue.js.",
+          "tags": ["frontend"]
+        }
+      ]
+    },
+    {
+      "id": "job-hyuna",
+      "kind": "job",
+      "title": "Web Developer",
+      "org": "Hyuna International",
+      "start": "2017-05",
+      "end": "2019-09",
+      "tags": ["backend"],
+      "bullets": [
+        {
+          "id": "hyuna-api",
+          "text": "Designed and deployed a critical internal RESTful API central to daily operations.",
+          "tags": ["backend"]
+        },
+        {
+          "id": "hyuna-serverless",
+          "text": "Developed serverless microservices using AWS Lambda and API Gateway.",
+          "tags": ["backend", "aws"]
+        }
+      ]
+    },
+    {
+      "id": "edu-msc-nottingham",
+      "kind": "education",
+      "title": "MSc Computer Science",
+      "org": "University of Nottingham",
+      "start": "2021",
+      "end": "2022",
+      "details": "Distinction.",
+      "tags": []
+    },
+    {
+      "id": "edu-bsc-uwi",
+      "kind": "education",
+      "title": "BSc Computer Science",
+      "org": "UWI Cave Hill",
+      "start": "2014",
+      "end": "2018",
+      "details": "(1:1) First Class Hons. Double Major.",
+      "tags": []
+    },
+    {
+      "id": "ach-startup-weekend",
+      "kind": "achievement",
+      "title": "Startup Weekend Winner",
+      "org": "Google for Entrepreneurs",
+      "details": "Awarded 'Most Innovative Idea'",
+      "tags": []
+    },
+    {
+      "id": "ach-research-paper",
+      "kind": "achievement",
+      "title": "Submitted Academic Research Paper (Under Review)",
+      "org": "Emerging Networks and Services in Developing Nations -- Barbados Use Case",
+      "details": "Co-authored with Supervising Professor, Dr. Milena Radenkovic",
+      "tags": ["research"]
+    },
+    {
+      "id": "proj-chat-pwa",
+      "kind": "project",
+      "title": "Real-time Chat PWA",
+      "details": "Engineered a PWA with real-time messaging, voice notes, and push notifications.",
+      "tech": "MongoDB • Socket.IO • Vue2",
+      "tags": ["personal", "fullstack"]
+    },
+    {
+      "id": "proj-dominoes",
+      "kind": "project",
+      "title": "Dominoes Multiplayer PWA",
+      "details": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
+      "tech": "Firebase • React",
+      "tags": ["personal", "frontend"]
+    },
+    {
+      "id": "int-hardware",
+      "kind": "interest",
+      "title": "Hardware Tinkering",
+      "details": "Raspberry Pi & Arduino, Home automation, Homelab setup",
+      "tags": []
+    },
+    {
+      "id": "int-cricket",
+      "kind": "interest",
+      "title": "Cricket",
+      "details": "Competitive play & Captaincy",
+      "tags": []
+    },
+    {
+      "id": "int-pwa-research",
+      "kind": "interest",
+      "title": "PWA Research",
+      "details": "Coding on the bleeding edge of web tech and Pushing web capabilities",
+      "tags": []
+    },
+    { "id": "comp-agile", "kind": "competency", "title": "Agile & Scrum", "tags": [] },
+    { "id": "comp-cicd", "kind": "competency", "title": "CI/CD Pipelines", "tags": ["devops"] },
+    { "id": "comp-tdd", "kind": "competency", "title": "TDD", "tags": [] },
+    { "id": "comp-jira", "kind": "competency", "title": "JIRA", "tags": [] },
+    { "id": "comp-microservices", "kind": "competency", "title": "Microservices Architecture", "tags": ["backend"] },
+    { "id": "comp-mentorship", "kind": "competency", "title": "Junior Mentorship", "tags": ["leadership"] },
+    { "id": "skill-typescript", "kind": "skill", "category": "Frontend", "title": "TypeScript", "tags": ["frontend"] },
+    { "id": "skill-javascript", "kind": "skill", "category": "Frontend", "title": "JavaScript", "tags": ["frontend"] },
+    { "id": "skill-react", "kind": "skill", "category": "Frontend", "title": "React", "tags": ["frontend"] },
+    { "id": "skill-nextjs", "kind": "skill", "category": "Frontend", "title": "Next.js", "tags": ["frontend"] },
+    { "id": "skill-vue", "kind": "skill", "category": "Frontend", "title": "Vue.js", "tags": ["frontend"] },
+    { "id": "skill-tailwind", "kind": "skill", "category": "Frontend", "title": "Tailwind CSS", "tags": ["frontend"] },
+    { "id": "skill-node", "kind": "skill", "category": "Backend", "title": "Node.js", "tags": ["backend"] },
+    { "id": "skill-express", "kind": "skill", "category": "Backend", "title": "Express", "tags": ["backend"] },
+    { "id": "skill-rest", "kind": "skill", "category": "Backend", "title": "RESTful APIs", "tags": ["backend"] },
+    { "id": "skill-graphql", "kind": "skill", "category": "Backend", "title": "GraphQL", "tags": ["backend"] },
+    { "id": "skill-gcp", "kind": "skill", "category": "DevOps & Cloud", "title": "GCP", "tags": ["devops"] },
+    { "id": "skill-lambda", "kind": "skill", "category": "DevOps & Cloud", "title": "AWS Lambda", "tags": ["devops", "aws"] },
+    { "id": "skill-kubernetes", "kind": "skill", "category": "DevOps & Cloud", "title": "Kubernetes", "tags": ["devops"] },
+    { "id": "skill-terraform", "kind": "skill", "category": "DevOps & Cloud", "title": "Terraform", "tags": ["devops"] },
+    { "id": "skill-gitops", "kind": "skill", "category": "DevOps & Cloud", "title": "GitOps", "tags": ["devops"] },
+    { "id": "skill-kafka", "kind": "skill", "category": "DevOps & Cloud", "title": "Kafka", "tags": ["devops", "backend"] },
+    { "id": "skill-sql", "kind": "skill", "category": "DevOps & Cloud", "title": "SQL", "tags": ["backend"] }
+  ]
+}
