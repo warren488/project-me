@@ -51,3 +51,63 @@ export interface PublishedCV {
   variant: string;
   pages: CVPage[];
 }
+
+// --- Library & variants (cv/library.json, cv/variants/*.json) ---
+export type EntryKind =
+  | "job"
+  | "education"
+  | "project"
+  | "achievement"
+  | "interest"
+  | "competency"
+  | "skill";
+
+export interface Bullet {
+  id: string;
+  text: string;
+  tags: string[];
+}
+
+export interface LibraryEntry {
+  id: string;
+  kind: EntryKind;
+  title: string;
+  org?: string;
+  category?: string; // skills only
+  start?: string; // "YYYY" or "YYYY-MM"
+  end?: string | null; // null = present
+  details?: string;
+  tech?: string;
+  tags: string[];
+  bullets?: Bullet[];
+  displayDates?: string; // added by the dev API, not stored
+}
+
+export type SectionName =
+  | "education"
+  | "competencies"
+  | "achievements"
+  | "interests"
+  | "skills"
+  | "experience"
+  | "projects";
+
+// "entry-id" = include every bullet; object form picks specific bullets.
+export type VariantRef = string | { id: string; bullets?: string[] };
+
+export type VariantPage = Partial<Record<SectionName, VariantRef[]>>;
+
+export interface Variant {
+  id: string;
+  name: string;
+  title: string;
+  summary?: string;
+  pages: VariantPage[];
+}
+
+// Which saved variants reference an entry, and each of its bullets. Built by
+// the dev API for the /admin dashboard.
+export interface EntryUsage {
+  variants: string[];
+  bullets: Record<string, string[]>;
+}

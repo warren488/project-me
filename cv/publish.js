@@ -160,7 +160,7 @@ function publish(variantId = "full") {
   return published;
 }
 
-module.exports = { resolveVariant, publish, formatRange };
+module.exports = { resolveVariant, publish, formatRange, SECTION_KINDS };
 
 if (require.main === module) {
   try {
