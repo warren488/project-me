@@ -17,6 +17,7 @@ import {
 interface State {
   library: { profile: Profile; entries: LibraryEntry[] };
   sections: Record<SectionName, EntryKind>;
+  timelineKinds: string[];
   variants: { id: string; name: string }[];
   published: string | null;
   usage: Record<string, EntryUsage>;
@@ -292,6 +293,12 @@ function reconcileVariant() {
   }
 }
 
+const publishTimeline = () =>
+  run(async () => {
+    const { count } = await api<{ count: number }>("timeline", "POST");
+    flash(`Published ${count} checkpoints to /timeline`);
+  });
+
 const saveEntry = (entry: LibraryEntry) =>
   run(async () => {
     const isNew = !editor.value?.entry;
@@ -558,6 +565,14 @@ onBeforeRouteLeave(
               @click="editProfile"
             >
               Profile
+            </button>
+            <button
+              class="a-btn"
+              title="Regenerate cv/timeline.json from the library (Save & publish also does this)"
+              :disabled="busy"
+              @click="publishTimeline"
+            >
+              Publish timeline
             </button>
           </div>
           <div class="row g-2 mt-1">
@@ -942,6 +957,7 @@ onBeforeRouteLeave(
           :known-tags="knownTags"
           :known-categories="knownCategories"
           :usage="editor.entry ? state.usage[editor.entry.id] : undefined"
+          :timeline-kinds="state.timelineKinds"
           :busy="busy"
           @save="saveEntry"
           @delete="deleteEntry"

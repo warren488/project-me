@@ -146,6 +146,56 @@ function resolveVariant(library, variant) {
   });
 }
 
+// Entry kinds shown on the public timeline unless the entry says otherwise
+// with `timeline: true|false`. Anything undated is never shown.
+const TIMELINE_DEFAULT_KINDS = ["job", "education"];
+
+const onTimeline = (entry) =>
+  !!entry.start &&
+  (typeof entry.timeline === "boolean"
+    ? entry.timeline
+    : TIMELINE_DEFAULT_KINDS.includes(entry.kind));
+
+// The public timeline: dated entries only, most recent first, without any
+// contact details.
+function resolveTimeline(library) {
+  return library.entries
+    .filter(onTimeline)
+    .sort(
+      (a, b) =>
+        (b.end === null) - (a.end === null) || b.start.localeCompare(a.start)
+    )
+    .map((entry) => {
+      const item = {
+        id: entry.id,
+        kind: entry.kind,
+        title: entry.title,
+        start: entry.start,
+        end: entry.end === undefined ? null : entry.end,
+        dates: formatRange(entry),
+        tags: entry.tags,
+      };
+      if (entry.org) item.org = entry.org;
+      if (entry.details) item.details = entry.details;
+      if (entry.tech) item.tech = entry.tech;
+      if (entry.bullets) item.bullets = entry.bullets.map((b) => b.text);
+      return item;
+    });
+}
+
+function publishTimeline() {
+  const library = readJson(path.join(CV_DIR, "library.json"));
+  const timeline = {
+    name: library.profile.name,
+    items: resolveTimeline(library),
+  };
+  fs.writeFileSync(
+    path.join(CV_DIR, "timeline.json"),
+    JSON.stringify(timeline, null, 2) + "\n"
+  );
+  return timeline;
+}
+
 function publish(variantId = "full") {
   const library = readJson(path.join(CV_DIR, "library.json"));
   const variant = readJson(path.join(CV_DIR, "variants", `${variantId}.json`));
@@ -157,15 +207,26 @@ function publish(variantId = "full") {
     path.join(CV_DIR, "published.json"),
     JSON.stringify(published, null, 2) + "\n"
   );
+  publishTimeline();
   return published;
 }
 
-module.exports = { resolveVariant, publish, formatRange, SECTION_KINDS };
+module.exports = {
+  resolveVariant,
+  resolveTimeline,
+  publish,
+  publishTimeline,
+  onTimeline,
+  formatRange,
+  SECTION_KINDS,
+  TIMELINE_DEFAULT_KINDS,
+};
 
 if (require.main === module) {
   try {
     const { variant } = publish(process.argv[2]);
     console.log(`Published variant "${variant}" to cv/published.json`);
+    console.log("Published cv/timeline.json");
   } catch (err) {
     console.error(err.message);
     process.exit(1);

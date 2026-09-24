@@ -10,6 +10,7 @@ const props = defineProps<{
   knownTags: string[];
   knownCategories: string[];
   usage?: EntryUsage;
+  timelineKinds: string[]; // kinds shown on the timeline by default
   busy: boolean;
 }>();
 
@@ -44,9 +45,17 @@ type Field = "org" | "category" | "dates" | "details" | "tech" | "bullets";
 const FIELDS: Record<EntryKind, Partial<Record<Field, string>>> = {
   job: { org: "Company", dates: "Dates", bullets: "Bullets" },
   education: { org: "Institution", dates: "Dates", details: "Details" },
-  project: { details: "Description", tech: "Tech (e.g. Vue • Node)" },
-  achievement: { org: "Awarded by", details: "Note" },
-  interest: { details: "Description" },
+  project: {
+    dates: "Dates (optional)",
+    details: "Description",
+    tech: "Tech (e.g. Vue • Node)",
+  },
+  achievement: {
+    org: "Awarded by",
+    dates: "Dates (optional)",
+    details: "Note",
+  },
+  interest: { dates: "Dates (optional)", details: "Description" },
   competency: {},
   skill: { category: "Category" },
 };
@@ -77,6 +86,7 @@ const form = reactive({
   present: false,
   details: "",
   tech: "",
+  timeline: false,
   tags: "",
   bullets: [] as BulletForm[],
 });
@@ -97,6 +107,9 @@ watch(
       present: !!entry?.start && !entry?.end,
       details: entry?.details ?? "",
       tech: entry?.tech ?? "",
+      timeline:
+        entry?.timeline ??
+        props.timelineKinds.includes(entry?.kind ?? form.kind),
       tags: (entry?.tags ?? []).join(", "),
       bullets: (entry?.bullets ?? []).map((b) => ({
         id: b.id,
@@ -112,6 +125,14 @@ watch(
 );
 
 const fields = computed(() => FIELDS[form.kind]);
+
+// Switching kind resets the timeline toggle to that kind's default.
+watch(
+  () => form.kind,
+  (kind) => {
+    form.timeline = props.timelineKinds.includes(kind);
+  }
+);
 const usedIn = computed(() => props.usage?.variants ?? []);
 
 // Ids are derived from the kind and title until the user edits them by hand.
@@ -197,6 +218,7 @@ function toEntry(): LibraryEntry {
   if (fields.value.details && form.details.trim())
     entry.details = form.details.trim();
   if (fields.value.tech && form.tech.trim()) entry.tech = form.tech.trim();
+  if (entry.start) entry.timeline = form.timeline;
   if (fields.value.bullets && form.bullets.length) {
     entry.bullets = form.bullets.map(
       (b): Bullet => ({
@@ -331,6 +353,22 @@ function remove() {
             class="form-check-input"
           />
           <span class="small">Present</span>
+        </label>
+        <label
+          class="col-12 form-check d-flex align-items-center gap-1 ps-4 mb-0"
+        >
+          <input
+            v-model="form.timeline"
+            type="checkbox"
+            class="form-check-input"
+            :disabled="!form.start.trim()"
+          />
+          <span class="small">
+            Show on the public timeline
+            <span v-if="!form.start.trim()" class="text-muted"
+              >(needs a start date)</span
+            >
+          </span>
         </label>
       </template>
       <label v-if="fields.details" class="col-12">

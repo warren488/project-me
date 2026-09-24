@@ -169,28 +169,150 @@
       "details": "Coding on the bleeding edge of web tech and Pushing web capabilities",
       "tags": []
     },
-    { "id": "comp-agile", "kind": "competency", "title": "Agile & Scrum", "tags": [] },
-    { "id": "comp-cicd", "kind": "competency", "title": "CI/CD Pipelines", "tags": ["devops"] },
+    {
+      "id": "comp-agile",
+      "kind": "competency",
+      "title": "Agile & Scrum",
+      "tags": []
+    },
+    {
+      "id": "comp-cicd",
+      "kind": "competency",
+      "title": "CI/CD Pipelines",
+      "tags": ["devops"]
+    },
     { "id": "comp-tdd", "kind": "competency", "title": "TDD", "tags": [] },
     { "id": "comp-jira", "kind": "competency", "title": "JIRA", "tags": [] },
-    { "id": "comp-microservices", "kind": "competency", "title": "Microservices Architecture", "tags": ["backend"] },
-    { "id": "comp-mentorship", "kind": "competency", "title": "Junior Mentorship", "tags": ["leadership"] },
-    { "id": "skill-typescript", "kind": "skill", "category": "Frontend", "title": "TypeScript", "tags": ["frontend"] },
-    { "id": "skill-javascript", "kind": "skill", "category": "Frontend", "title": "JavaScript", "tags": ["frontend"] },
-    { "id": "skill-react", "kind": "skill", "category": "Frontend", "title": "React", "tags": ["frontend"] },
-    { "id": "skill-nextjs", "kind": "skill", "category": "Frontend", "title": "Next.js", "tags": ["frontend"] },
-    { "id": "skill-vue", "kind": "skill", "category": "Frontend", "title": "Vue.js", "tags": ["frontend"] },
-    { "id": "skill-tailwind", "kind": "skill", "category": "Frontend", "title": "Tailwind CSS", "tags": ["frontend"] },
-    { "id": "skill-node", "kind": "skill", "category": "Backend", "title": "Node.js", "tags": ["backend"] },
-    { "id": "skill-express", "kind": "skill", "category": "Backend", "title": "Express", "tags": ["backend"] },
-    { "id": "skill-rest", "kind": "skill", "category": "Backend", "title": "RESTful APIs", "tags": ["backend"] },
-    { "id": "skill-graphql", "kind": "skill", "category": "Backend", "title": "GraphQL", "tags": ["backend"] },
-    { "id": "skill-gcp", "kind": "skill", "category": "DevOps & Cloud", "title": "GCP", "tags": ["devops"] },
-    { "id": "skill-lambda", "kind": "skill", "category": "DevOps & Cloud", "title": "AWS Lambda", "tags": ["devops", "aws"] },
-    { "id": "skill-kubernetes", "kind": "skill", "category": "DevOps & Cloud", "title": "Kubernetes", "tags": ["devops"] },
-    { "id": "skill-terraform", "kind": "skill", "category": "DevOps & Cloud", "title": "Terraform", "tags": ["devops"] },
-    { "id": "skill-gitops", "kind": "skill", "category": "DevOps & Cloud", "title": "GitOps", "tags": ["devops"] },
-    { "id": "skill-kafka", "kind": "skill", "category": "DevOps & Cloud", "title": "Kafka", "tags": ["devops", "backend"] },
-    { "id": "skill-sql", "kind": "skill", "category": "DevOps & Cloud", "title": "SQL", "tags": ["backend"] }
+    {
+      "id": "comp-microservices",
+      "kind": "competency",
+      "title": "Microservices Architecture",
+      "tags": ["backend"]
+    },
+    {
+      "id": "comp-mentorship",
+      "kind": "competency",
+      "title": "Junior Mentorship",
+      "tags": ["leadership"]
+    },
+    {
+      "id": "skill-typescript",
+      "kind": "skill",
+      "category": "Frontend",
+      "title": "TypeScript",
+      "tags": ["frontend"]
+    },
+    {
+      "id": "skill-javascript",
+      "kind": "skill",
+      "category": "Frontend",
+      "title": "JavaScript",
+      "tags": ["frontend"]
+    },
+    {
+      "id": "skill-react",
+      "kind": "skill",
+      "category": "Frontend",
+      "title": "React",
+      "tags": ["frontend"]
+    },
+    {
+      "id": "skill-nextjs",
+      "kind": "skill",
+      "category": "Frontend",
+      "title": "Next.js",
+      "tags": ["frontend"]
+    },
+    {
+      "id": "skill-vue",
+      "kind": "skill",
+      "category": "Frontend",
+      "title": "Vue.js",
+      "tags": ["frontend"]
+    },
+    {
+      "id": "skill-tailwind",
+      "kind": "skill",
+      "category": "Frontend",
+      "title": "Tailwind CSS",
+      "tags": ["frontend"]
+    },
+    {
+      "id": "skill-node",
+      "kind": "skill",
+      "category": "Backend",
+      "title": "Node.js",
+      "tags": ["backend"]
+    },
+    {
+      "id": "skill-express",
+      "kind": "skill",
+      "category": "Backend",
+      "title": "Express",
+      "tags": ["backend"]
+    },
+    {
+      "id": "skill-rest",
+      "kind": "skill",
+      "category": "Backend",
+      "title": "RESTful APIs",
+      "tags": ["backend"]
+    },
+    {
+      "id": "skill-graphql",
+      "kind": "skill",
+      "category": "Backend",
+      "title": "GraphQL",
+      "tags": ["backend"]
+    },
+    {
+      "id": "skill-gcp",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "GCP",
+      "tags": ["devops"]
+    },
+    {
+      "id": "skill-lambda",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "AWS Lambda",
+      "tags": ["devops", "aws"]
+    },
+    {
+      "id": "skill-kubernetes",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "Kubernetes",
+      "tags": ["devops"]
+    },
+    {
+      "id": "skill-terraform",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "Terraform",
+      "tags": ["devops"]
+    },
+    {
+      "id": "skill-gitops",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "GitOps",
+      "tags": ["devops"]
+    },
+    {
+      "id": "skill-kafka",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "Kafka",
+      "tags": ["devops", "backend"]
+    },
+    {
+      "id": "skill-sql",
+      "kind": "skill",
+      "category": "DevOps & Cloud",
+      "title": "SQL",
+      "tags": ["backend"]
+    }
   ]
 }

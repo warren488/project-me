@@ -14,6 +14,11 @@ const routes: Array<RouteRecordRaw> = [
     component: ExperienceView,
   },
   {
+    path: "/timeline",
+    name: "timeline",
+    component: () => import("../views/TimelineView.vue"),
+  },
+  {
     path: "/home",
     redirect: "/",
   },

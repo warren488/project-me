@@ -49,6 +49,16 @@
       <nav>
         <ul class="app-header__links">
           <li>
+            <router-link to="/my-experience" class="nav-link nav-link--text">
+              CV
+            </router-link>
+          </li>
+          <li>
+            <router-link to="/timeline" class="nav-link nav-link--text">
+              Timeline
+            </router-link>
+          </li>
+          <li>
             <a href="https://twitter.com/warrendadev" class="nav-link">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -193,6 +203,19 @@ export default defineComponent({
 
 .nav-link {
   padding-bottom: 0px;
+}
+
+.nav-link--text {
+  padding-bottom: 0.35rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  border-bottom: 2px solid transparent;
+
+  &.router-link-active {
+    color: var(--tertiary);
+    border-bottom-color: var(--tertiary);
+  }
 }
 
 @media (max-width: 576px) {

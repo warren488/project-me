@@ -5,8 +5,10 @@ const path = require("path");
 const {
   resolveVariant,
   publish,
+  publishTimeline,
   formatRange,
   SECTION_KINDS,
+  TIMELINE_DEFAULT_KINDS,
 } = require("./publish");
 
 const CV_DIR = __dirname;
@@ -17,8 +19,12 @@ const DATE = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
 const KINDS = Object.values(SECTION_KINDS);
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+// Written through prettier so the files match what lint-staged would produce.
 const writeJson = (file, data) =>
-  fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  fs.writeFileSync(
+    file,
+    require("prettier").format(JSON.stringify(data), { parser: "json" })
+  );
 
 const checkId = (id, what = "id") => {
   if (typeof id !== "string" || !ID.test(id))
@@ -94,6 +100,7 @@ function state() {
   return {
     library,
     sections: SECTION_KINDS,
+    timelineKinds: TIMELINE_DEFAULT_KINDS,
     variants: variants.map(({ id, name }) => ({ id, name })),
     published,
     usage: used,
@@ -153,6 +160,13 @@ function cleanEntry(input) {
   if (details) entry.details = details;
   const tech = optionalString(input, "tech");
   if (tech) entry.tech = tech;
+  // Only stored when it differs from the default for the kind.
+  if (
+    typeof input.timeline === "boolean" &&
+    input.timeline !== TIMELINE_DEFAULT_KINDS.includes(input.kind)
+  ) {
+    entry.timeline = input.timeline;
+  }
   entry.tags = tagList(input.tags, `"${id}"`);
 
   if (input.bullets !== undefined && input.bullets !== null) {
@@ -294,6 +308,8 @@ module.exports = function mountCvApi(app) {
         case "POST publish/:id":
           variantPath(id); // validates the id
           return send(200, publish(id));
+        case "POST timeline":
+          return send(200, { count: publishTimeline().items.length });
         case "PUT profile":
           return send(200, { profile: saveProfile(await readBody(req)) });
         case "PUT entries/:id":

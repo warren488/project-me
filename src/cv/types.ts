@@ -52,6 +52,26 @@ export interface PublishedCV {
   pages: CVPage[];
 }
 
+// One checkpoint on the public timeline (cv/timeline.json).
+export interface TimelineItem {
+  id: string;
+  kind: string;
+  title: string;
+  org?: string;
+  start: string; // "YYYY" or "YYYY-MM"
+  end: string | null; // null = present
+  dates: string;
+  details?: string;
+  tech?: string;
+  tags: string[];
+  bullets?: string[];
+}
+
+export interface PublishedTimeline {
+  name: string;
+  items: TimelineItem[];
+}
+
 // --- Library & variants (cv/library.json, cv/variants/*.json) ---
 export interface Profile {
   name: string;
@@ -86,6 +106,7 @@ export interface LibraryEntry {
   end?: string | null; // null = present
   details?: string;
   tech?: string;
+  timeline?: boolean; // override the per-kind default for the public timeline
   tags: string[];
   bullets?: Bullet[];
   displayDates?: string; // added by the dev API, not stored
