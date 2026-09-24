@@ -568,7 +568,7 @@ onBeforeRouteLeave(
             </button>
             <button
               class="a-btn"
-              title="Regenerate cv/timeline.json from the library (Save & publish also does this)"
+              title="Regenerate cv/timeline.json. Saving an entry already does this; use it after editing library.json by hand."
               :disabled="busy"
               @click="publishTimeline"
             >

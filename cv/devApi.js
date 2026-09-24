@@ -235,6 +235,7 @@ function saveProfile(input) {
   const library = readJson(LIBRARY_FILE);
   library.profile = profile;
   writeJson(LIBRARY_FILE, library);
+  publishTimeline();
   return profile;
 }
 
@@ -247,6 +248,8 @@ function saveEntry(id, input) {
   if (index === -1) library.entries.push(entry);
   else library.entries[index] = entry;
   writeJson(LIBRARY_FILE, library);
+  // The timeline needs no selection step, so keep it in sync automatically.
+  publishTimeline();
   return entry;
 }
 
@@ -273,6 +276,7 @@ function deleteEntry(id) {
   }
   library.entries.splice(index, 1);
   writeJson(LIBRARY_FILE, library);
+  publishTimeline();
 }
 
 module.exports = function mountCvApi(app) {

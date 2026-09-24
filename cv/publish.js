@@ -158,12 +158,18 @@ const onTimeline = (entry) =>
 
 // The public timeline: dated entries only, most recent first, without any
 // contact details.
+// "2021-09" -> 24261; a bare year counts as January of that year.
+const monthIndex = (date) => {
+  const [y, m] = date.split("-").map(Number);
+  return y * 12 + ((m || 1) - 1);
+};
+
 function resolveTimeline(library) {
+  const endOf = (e) => (e.end ? monthIndex(e.end) : Infinity);
   return library.entries
     .filter(onTimeline)
     .sort(
-      (a, b) =>
-        (b.end === null) - (a.end === null) || b.start.localeCompare(a.start)
+      (a, b) => monthIndex(b.start) - monthIndex(a.start) || endOf(b) - endOf(a)
     )
     .map((entry) => {
       const item = {

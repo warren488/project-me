@@ -8,7 +8,10 @@
       "start": "2022-10",
       "end": null,
       "dates": "Oct 2022 – Present",
-      "tags": ["fullstack", "devops"],
+      "tags": [
+        "fullstack",
+        "devops"
+      ],
       "org": "The RAD Consulting Group",
       "bullets": [
         "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
@@ -17,29 +20,31 @@
       ]
     },
     {
+      "id": "edu-msc-nottingham",
+      "kind": "education",
+      "title": "MSc Computer Science",
+      "start": "2021-09",
+      "end": "2022-09",
+      "dates": "Sep 2021 – Sep 2022",
+      "tags": [],
+      "org": "University of Nottingham",
+      "details": "Distinction."
+    },
+    {
       "id": "job-smartterm",
       "kind": "job",
       "title": "Software Engineer",
       "start": "2021-01",
       "end": "2021-06",
       "dates": "Jan 2021 – Jun 2021",
-      "tags": ["frontend"],
+      "tags": [
+        "frontend"
+      ],
       "org": "Smartterm Ltd",
       "bullets": [
         "Developed high-performance educational platforms using Agile methodologies.",
         "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito."
       ]
-    },
-    {
-      "id": "edu-msc-nottingham",
-      "kind": "education",
-      "title": "MSc Computer Science",
-      "start": "2021",
-      "end": "2022",
-      "dates": "2021 – 2022",
-      "tags": [],
-      "org": "University of Nottingham",
-      "details": "Distinction."
     },
     {
       "id": "job-smartmatic",
@@ -48,7 +53,9 @@
       "start": "2019-09",
       "end": "2020-12",
       "dates": "Sep 2019 – Dec 2020",
-      "tags": ["frontend"],
+      "tags": [
+        "frontend"
+      ],
       "org": "Smartmatic International",
       "bullets": [
         "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
@@ -62,7 +69,9 @@
       "start": "2017-05",
       "end": "2019-09",
       "dates": "May 2017 – Sep 2019",
-      "tags": ["backend"],
+      "tags": [
+        "backend"
+      ],
       "org": "Hyuna International",
       "bullets": [
         "Designed and deployed a critical internal RESTful API central to daily operations.",
