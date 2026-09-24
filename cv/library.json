@@ -313,6 +313,15 @@
       "category": "DevOps & Cloud",
       "title": "SQL",
       "tags": ["backend"]
+    },
+    {
+      "id": "edu-hc",
+      "kind": "education",
+      "title": "Associate Degree",
+      "org": "Harrison College",
+      "start": "2012-09",
+      "end": "2014-09",
+      "tags": []
     }
   ]
 }

@@ -88,6 +88,16 @@
       "tags": [],
       "org": "UWI Cave Hill",
       "details": "(1:1) First Class Hons. Double Major."
+    },
+    {
+      "id": "edu-hc",
+      "kind": "education",
+      "title": "Associate Degree",
+      "start": "2012-09",
+      "end": "2014-09",
+      "dates": "Sep 2012 – Sep 2014",
+      "tags": [],
+      "org": "Harrison College"
     }
   ]
 }

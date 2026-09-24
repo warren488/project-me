@@ -200,6 +200,8 @@ function setFilter(kind: string | null) {
 $line: 2px;
 $node: 18px;
 $gap: 3rem; // space between the line and a card on desktop
+$item-pad: 0.75rem; // vertical padding of each list item
+$node-top: 2rem; // node top edge, measured from the list item
 
 .timeline {
   --job: var(--tertiary);
@@ -344,7 +346,7 @@ $gap: 3rem; // space between the line and a card on desktop
 .timeline__item {
   position: relative;
   width: 50%;
-  padding: 0.75rem 0;
+  padding: $item-pad 0;
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 0.6s ease, transform 0.6s ease;
@@ -381,7 +383,7 @@ $gap: 3rem; // space between the line and a card on desktop
 
 .timeline__node {
   position: absolute;
-  top: 2rem;
+  top: $node-top;
   width: $node;
   height: $node;
   border-radius: 50%;
@@ -425,15 +427,16 @@ $gap: 3rem; // space between the line and a card on desktop
   border-radius: 14px;
   padding: 1.25rem 1.4rem;
   backdrop-filter: blur(6px);
-  transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+  transition: border-color 0.25s, box-shadow 0.25s;
 
   // Short connector from the card edge to the node.
   &::before {
     content: "";
     position: absolute;
-    top: calc(2rem + #{$node * 0.5 - 1px});
+    // Centre on the node: the card starts $item-pad below the item's top.
+    top: calc(#{$node-top - $item-pad} + #{$node * 0.5 - 1px});
     width: calc(#{$gap} - #{$node * 0.5});
-    height: 1px;
+    height: 2px;
     background: linear-gradient(to right, var(--kind), transparent);
   }
   .is-left &::before {
@@ -444,9 +447,9 @@ $gap: 3rem; // space between the line and a card on desktop
     left: calc(-1 * (#{$gap} - #{$node * 0.5}));
   }
 
+  // No transform on hover: it would carry the connector off the node.
   &:hover {
     border-color: var(--kind);
-    transform: translateY(-2px);
     box-shadow: 0 12px 30px -18px var(--kind);
   }
 }
