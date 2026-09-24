@@ -53,6 +53,14 @@ export interface PublishedCV {
 }
 
 // --- Library & variants (cv/library.json, cv/variants/*.json) ---
+export interface Profile {
+  name: string;
+  location?: string;
+  phone?: string;
+  email: string;
+  website: string;
+}
+
 export type EntryKind =
   | "job"
   | "education"

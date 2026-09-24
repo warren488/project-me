@@ -8,13 +8,14 @@ import {
   EntryKind,
   EntryUsage,
   LibraryEntry,
+  Profile,
   SectionName,
   Variant,
   VariantRef,
 } from "@/cv/types";
 
 interface State {
-  library: { profile: Record<string, string>; entries: LibraryEntry[] };
+  library: { profile: Profile; entries: LibraryEntry[] };
   sections: Record<SectionName, EntryKind>;
   variants: { id: string; name: string }[];
   published: string | null;
@@ -193,6 +194,51 @@ function refLabel(ref: VariantRef) {
     label += ` (${ref.bullets.length}/${entry.bullets.length} bullets)`;
   }
   return label;
+}
+
+// --- Profile (name and contact details, shared by every variant) ---
+const profileForm = ref<Profile | null>(null);
+
+const editProfile = () => {
+  if (state.value) profileForm.value = { ...state.value.library.profile };
+};
+
+const saveProfile = () =>
+  run(async () => {
+    if (!profileForm.value) return;
+    await api("profile", "PUT", profileForm.value);
+    await loadState();
+    schedulePreview();
+    profileForm.value = null;
+    flash("Profile saved");
+  });
+
+// --- Pages ---
+function addPage() {
+  if (!variant.value) return;
+  variant.value.pages.push({});
+  targetPage.value = variant.value.pages.length - 1;
+}
+
+function removePage(index: number) {
+  const pages = variant.value?.pages;
+  if (!pages || pages.length < 2) return;
+  const count = SECTION_ORDER.reduce(
+    (n, s) => n + (pages[index][s]?.length ?? 0),
+    0
+  );
+  if (
+    count &&
+    !confirm(
+      `Page ${index + 1} has ${count} item${
+        count > 1 ? "s" : ""
+      }. Remove the page and drop them from this variant?`
+    )
+  ) {
+    return;
+  }
+  pages.splice(index, 1);
+  targetPage.value = Math.min(targetPage.value, pages.length - 1);
 }
 
 // --- Library entries (add / edit / delete) ---
@@ -505,6 +551,14 @@ onBeforeRouteLeave(
             <button class="a-btn" :disabled="busy" @click="duplicate">
               Duplicate
             </button>
+            <button
+              class="a-btn"
+              title="Name and contact details, shared by every variant"
+              :disabled="busy"
+              @click="editProfile"
+            >
+              Profile
+            </button>
           </div>
           <div class="row g-2 mt-1">
             <label class="col-6">
@@ -713,7 +767,17 @@ onBeforeRouteLeave(
         <!-- Layout: order within each page/section -->
         <div v-else>
           <div v-for="(page, p) in variant.pages" :key="p" class="mb-3">
-            <h6 class="cv-admin__group">Page {{ p + 1 }}</h6>
+            <h6 class="cv-admin__group d-flex align-items-center">
+              <span class="flex-grow-1">Page {{ p + 1 }}</span>
+              <button
+                v-if="variant.pages.length > 1"
+                class="a-btn a-btn--icon fw-normal text-lowercase"
+                title="Remove this page"
+                @click="removePage(p)"
+              >
+                remove page
+              </button>
+            </h6>
             <div
               v-for="section in SECTION_ORDER.filter((s) => page[s]?.length)"
               :key="section"
@@ -773,6 +837,7 @@ onBeforeRouteLeave(
               Empty page
             </p>
           </div>
+          <button class="a-btn" @click="addPage">+ Add page</button>
         </div>
       </section>
 
@@ -798,6 +863,70 @@ onBeforeRouteLeave(
           <CvDocument v-if="preview.length" :pages="preview" />
         </div>
       </section>
+    </div>
+
+    <!-- Profile editor -->
+    <div
+      v-if="profileForm"
+      class="cv-admin__modal no-print"
+      @click.self="profileForm = null"
+    >
+      <form class="cv-admin__dialog" @submit.prevent="saveProfile">
+        <h5>Profile</h5>
+        <p class="small text-muted">
+          Only name, email and website are published; location and phone stay in
+          the library.
+        </p>
+        <div class="row g-2">
+          <label class="col-12">
+            <span class="cv-admin__label">Name</span>
+            <input
+              v-model="profileForm.name"
+              class="form-control form-control-sm"
+              required
+            />
+          </label>
+          <label class="col-6">
+            <span class="cv-admin__label">Email</span>
+            <input
+              v-model="profileForm.email"
+              type="email"
+              class="form-control form-control-sm"
+              required
+            />
+          </label>
+          <label class="col-6">
+            <span class="cv-admin__label">Website</span>
+            <input
+              v-model="profileForm.website"
+              class="form-control form-control-sm"
+              required
+            />
+          </label>
+          <label class="col-6">
+            <span class="cv-admin__label">Location</span>
+            <input
+              v-model="profileForm.location"
+              class="form-control form-control-sm"
+            />
+          </label>
+          <label class="col-6">
+            <span class="cv-admin__label">Phone</span>
+            <input
+              v-model="profileForm.phone"
+              class="form-control form-control-sm"
+            />
+          </label>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <button type="submit" class="a-btn a-btn--primary" :disabled="busy">
+            Save profile
+          </button>
+          <button type="button" class="a-btn" @click="profileForm = null">
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
 
     <!-- Entry editor -->

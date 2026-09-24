@@ -9,12 +9,13 @@ defineProps({
 
 <template>
   <div class="cv-wrapper">
-    <div class="cv-container">
+    <div class="cv-container" :style="{ '--pages': pages.length }">
       <aside class="sidebar">
         <div
           v-for="(page, index) of pages"
           :key="index"
-          :class="'sidebar-page-' + (index + 1)"
+          class="cv-page"
+          :class="{ 'cv-page--first': index === 0 }"
         >
           <div class="sidebar-personal-info">
             <div class="profile-header">
@@ -98,7 +99,8 @@ defineProps({
         <div
           v-for="(page, index) in pages"
           :key="index"
-          :class="'main-content-page-' + (index + 1)"
+          class="cv-page"
+          :class="{ 'cv-page--first': index === 0 }"
         >
           <p
             class="summary"
@@ -229,7 +231,8 @@ defineProps({
   padding: var(--column-y-padding) var(--space-md);
 }
 
-.sidebar-page-2 .sidebar-personal-info {
+/* Name and contact details only appear on the first page. */
+.cv-page:not(.cv-page--first) .sidebar-personal-info {
   display: none;
 }
 
@@ -505,7 +508,8 @@ defineProps({
     box-shadow: none;
     display: grid;
     grid-template-columns: 280px 1fr;
-    min-height: 200vh;
+    /* One printed sheet per CV page; --pages is set from the pages prop. */
+    min-height: calc(var(--pages, 1) * 100vh);
     overflow: hidden;
   }
 
@@ -514,15 +518,10 @@ defineProps({
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .sidebar-page-1,
-  .sidebar-page-2,
-  .main-content-page-1,
-  .main-content-page-2 {
+  .cv-page {
     height: calc(100vh - var(--column-y-padding, 0px));
-    /* page-break-inside: avoid; */
   }
-  .sidebar-page-2,
-  .main-content-page-2 {
+  .cv-page:not(.cv-page--first) {
     padding-top: var(--column-y-padding);
   }
 

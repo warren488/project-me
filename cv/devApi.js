@@ -206,6 +206,24 @@ function checkEntryStillFits(entry, variants) {
   }
 }
 
+const PROFILE_FIELDS = ["name", "location", "phone", "email", "website"];
+
+function saveProfile(input) {
+  if (!input || typeof input !== "object") throw new Error("No profile");
+  const profile = {};
+  for (const key of PROFILE_FIELDS) {
+    const value = optionalString(input, key);
+    if (value) profile[key] = value;
+  }
+  for (const key of ["name", "email", "website"]) {
+    if (!profile[key]) throw new Error(`Profile ${key} is required`);
+  }
+  const library = readJson(LIBRARY_FILE);
+  library.profile = profile;
+  writeJson(LIBRARY_FILE, library);
+  return profile;
+}
+
 function saveEntry(id, input) {
   const entry = cleanEntry(input);
   if (entry.id !== id) throw new Error("Entry id does not match URL");
@@ -276,6 +294,8 @@ module.exports = function mountCvApi(app) {
         case "POST publish/:id":
           variantPath(id); // validates the id
           return send(200, publish(id));
+        case "PUT profile":
+          return send(200, { profile: saveProfile(await readBody(req)) });
         case "PUT entries/:id":
           return send(200, { entry: saveEntry(id, await readBody(req)) });
         case "DELETE entries/:id":
