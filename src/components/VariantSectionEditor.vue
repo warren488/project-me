@@ -10,11 +10,13 @@ defineProps<{
   sidebar: boolean;
   canUp: boolean;
   canDown: boolean;
+  collapsed: boolean;
   refLabel: (ref: VariantRef) => string;
 }>();
 
 const emit = defineEmits<{
   (e: "move", by: number): void;
+  (e: "toggle"): void;
   (e: "order", order: SectionOrder): void;
   (e: "break-after"): void;
   (e: "move-ref", index: number, by: number): void;
@@ -25,13 +27,24 @@ const emit = defineEmits<{
 
 const orderValue = (event: Event) =>
   (event.target as HTMLSelectElement).value as SectionOrder;
+const count = (item: VariantSection) =>
+  item.refs.filter((r) => !isBreak(r)).length;
 </script>
 
 <template>
   <div class="vse">
-    <div class="vse__head">
-      <span class="vse__label flex-grow-1">
+    <div class="vse__head" :class="{ 'is-collapsed': collapsed }">
+      <button
+        class="vse__toggle"
+        :title="collapsed ? 'Expand' : 'Collapse'"
+        :aria-expanded="!collapsed"
+        @click="emit('toggle')"
+      >
+        {{ collapsed ? "▸" : "▾" }}
+      </button>
+      <span class="vse__label flex-grow-1" @click="emit('toggle')">
         {{ label }}
+        <span class="vse__tag">{{ count(item) }}</span>
         <span v-if="sheet" class="vse__tag">p{{ sheet }}</span>
       </span>
       <select
@@ -67,7 +80,7 @@ const orderValue = (event: Event) =>
         ⤓
       </button>
     </div>
-    <template v-for="(ref, r) in item.refs" :key="r">
+    <template v-for="(ref, r) in !collapsed ? item.refs : []" :key="r">
       <div v-if="isBreak(ref)" class="vse__break">
         <span class="flex-grow-1">— page break ({{ label }} continues) —</span>
         <button
@@ -133,6 +146,25 @@ const orderValue = (event: Event) =>
   padding-bottom: 0.3rem;
   border-bottom: 1px solid #cbd5e1;
   margin-bottom: 0.25rem;
+
+  &.is-collapsed {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+}
+
+.vse__toggle {
+  border: none;
+  background: none;
+  padding: 0 0.15rem;
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.vse__label {
+  cursor: pointer;
 }
 
 .vse__label {

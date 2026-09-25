@@ -45,11 +45,11 @@
     {
       "section": "experience",
       "refs": [
+        "job-rad",
         "job-smartterm",
         "job-smartmatic",
         { "break": true },
-        "job-hyuna",
-        "job-rad"
+        "job-hyuna"
       ]
     },
     {

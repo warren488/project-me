@@ -1,6 +1,6 @@
 {
-  "variant": "full",
-  "layout": "styled",
+  "variant": "ats",
+  "layout": "ats",
   "pages": [
     {
       "profile": {
@@ -11,11 +11,52 @@
         "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives."
       },
       "sections": [
+        "experience",
         "education",
         "competencies",
         "achievements",
+        "interests",
         "skills",
-        "experience"
+        "projects"
+      ],
+      "experience": [
+        {
+          "title": "Software Engineering Consultant",
+          "company": "The RAD Consulting Group",
+          "dates": "Oct 2022 – Oct 2026",
+          "details": [
+            "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
+            "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing <strong>GitOps</strong> workflows.",
+            "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>."
+          ]
+        },
+        {
+          "title": "Software Engineer",
+          "company": "Smartterm Ltd",
+          "dates": "Jan 2021 – Jun 2021",
+          "details": [
+            "Developed high-performance educational platforms using Agile methodologies.",
+            "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito."
+          ]
+        },
+        {
+          "title": "Software Engineer",
+          "company": "Smartmatic International",
+          "dates": "Sep 2019 – Dec 2020",
+          "details": [
+            "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
+            "Co-developed a company-wide Design System focused on Accessibility using <strong>Web Components</strong> and Vue.js."
+          ]
+        },
+        {
+          "title": "Web Developer",
+          "company": "Hyuna International",
+          "dates": "May 2017 – Sep 2019",
+          "details": [
+            "Designed and deployed a critical internal RESTful API central to daily operations.",
+            "Developed serverless microservices using AWS Lambda and API Gateway."
+          ]
+        }
       ],
       "education": [
         {
@@ -51,6 +92,20 @@
           "note": "Co-authored with Supervising Professor, Dr. Milena Radenkovic"
         }
       ],
+      "interests": [
+        {
+          "name": "Hardware Tinkering",
+          "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
+        },
+        {
+          "name": "Cricket",
+          "desc": "Competitive play & Captaincy"
+        },
+        {
+          "name": "PWA Research",
+          "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
+        }
+      ],
       "skills": {
         "Frontend": [
           "TypeScript",
@@ -76,77 +131,6 @@
           "SQL"
         ]
       },
-      "experience": [
-        {
-          "title": "Software Engineer",
-          "company": "Smartterm Ltd",
-          "dates": "Jan 2021 – Jun 2021",
-          "details": [
-            "Developed high-performance educational platforms using Agile methodologies.",
-            "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito."
-          ]
-        },
-        {
-          "title": "Software Engineer",
-          "company": "Smartmatic International",
-          "dates": "Sep 2019 – Dec 2020",
-          "details": [
-            "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
-            "Co-developed a company-wide Design System focused on Accessibility using <strong>Web Components</strong> and Vue.js."
-          ]
-        }
-      ]
-    },
-    {
-      "profile": {
-        "name": "Warren Scantlebury",
-        "title": "Full Stack Software Engineer",
-        "email": "warren.scantlebury@gmail.com",
-        "website": "warren.scantlebury.io"
-      },
-      "sections": [
-        "experience",
-        "interests",
-        "projects"
-      ],
-      "continued": [
-        "experience"
-      ],
-      "experience": [
-        {
-          "title": "Web Developer",
-          "company": "Hyuna International",
-          "dates": "May 2017 – Sep 2019",
-          "details": [
-            "Designed and deployed a critical internal RESTful API central to daily operations.",
-            "Developed serverless microservices using AWS Lambda and API Gateway."
-          ]
-        },
-        {
-          "title": "Software Engineering Consultant",
-          "company": "The RAD Consulting Group",
-          "dates": "Oct 2022 – Oct 2026",
-          "details": [
-            "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
-            "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing <strong>GitOps</strong> workflows.",
-            "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>."
-          ]
-        }
-      ],
-      "interests": [
-        {
-          "name": "Hardware Tinkering",
-          "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
-        },
-        {
-          "name": "Cricket",
-          "desc": "Competitive play & Captaincy"
-        },
-        {
-          "name": "PWA Research",
-          "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
-        }
-      ],
       "projects": [
         {
           "title": "Real-time Chat PWA",
@@ -157,11 +141,6 @@
           "title": "Dominoes Multiplayer PWA",
           "desc": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
           "tech": "Firebase • React"
-        },
-        {
-          "title": "Fitnese",
-          "desc": "Fitnese is an activity tracking app focused on detailed exercise metadata, injury risk tracking, rehabilitation benefits, and offline-first functionality.",
-          "tech": "capacitor vue PWA"
         }
       ]
     }
