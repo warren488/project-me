@@ -12,6 +12,7 @@ import { sortRefsByDate } from "@/cv/order";
 import CvAtsDocument from "@/components/CvAtsDocument.vue";
 import CvDocument from "@/components/CvDocument.vue";
 import EntryEditor from "@/components/EntryEditor.vue";
+import VariantSectionEditor from "@/components/VariantSectionEditor.vue";
 import {
   CVPage,
   EntryKind,
@@ -193,8 +194,6 @@ function setOrder(i: number, order: SectionOrder) {
     sortRefsByDate(item.refs, byId.value);
   }
 }
-const orderValue = (event: Event) =>
-  (event.target as HTMLSelectElement).value as SectionOrder;
 
 // Swap with a neighbour. Moving an entry past a page break moves it to the
 // other sheet; moving a section past a break does the same for the section.
@@ -222,6 +221,53 @@ function removeRefBreak(i: number, index: number) {
   sectionItem(i)?.refs.splice(index, 1);
 }
 const isSidebar = (section: SectionName) => SIDEBAR_SECTIONS.includes(section);
+
+// --- Two-column layout view (styled variants) ---
+// Groups the list into sheets separated by section-level breaks; each group
+// lists the indices of its sidebar and main sections.
+interface LayoutGroup {
+  breakIndex?: number; // the break that starts this group, if any
+  sidebar: number[];
+  main: number[];
+}
+const layoutGroups = computed<LayoutGroup[]>(() => {
+  const groups: LayoutGroup[] = [{ sidebar: [], main: [] }];
+  variant.value?.sections.forEach((item, i) => {
+    if (isBreak(item)) {
+      groups.push({ breakIndex: i, sidebar: [], main: [] });
+      return;
+    }
+    const group = groups[groups.length - 1];
+    (isSidebar(item.section) ? group.sidebar : group.main).push(i);
+  });
+  return groups;
+});
+
+// In the two-column view a section moves within its own column: it steps
+// over the nearest preceding/following section of the same column, or a
+// page break (which moves it to the other sheet).
+function columnTarget(i: number, by: number) {
+  const list = variant.value?.sections;
+  const me = list?.[i];
+  if (!list || !me || isBreak(me)) return -1;
+  for (let j = i + by; j >= 0 && j < list.length; j += by) {
+    const it = list[j];
+    if (isBreak(it) || isSidebar(it.section) === isSidebar(me.section)) {
+      return j;
+    }
+  }
+  return -1;
+}
+function moveInColumn(i: number, by: number) {
+  const list = variant.value?.sections;
+  const j = columnTarget(i, by);
+  if (!list || j < 0) return;
+  const [me] = list.splice(i, 1);
+  list.splice(j, 0, me);
+}
+const twoColumn = computed(
+  () => (variant.value?.layout ?? "styled") === "styled"
+);
 
 function selectedBullets(entry: LibraryEntry) {
   const at = placement.value.get(entry.id);
@@ -881,56 +927,84 @@ onBeforeRouteLeave(
             column alike, and a section that continues repeats its heading. Name
             and contact details only print on sheet 1.
           </p>
-          <template v-for="(item, i) in variant.sections" :key="i">
-            <div v-if="isBreak(item)" class="cv-admin__break">
-              <span class="flex-grow-1">— page break —</span>
-              <button
-                class="a-btn a-btn--icon"
-                title="Move up"
-                :disabled="i === 0"
-                @click="moveSection(i, -1)"
+
+          <!-- Styled layout: sidebar and main side by side, as on the CV -->
+          <template v-if="twoColumn">
+            <template v-for="(group, g) in layoutGroups" :key="g">
+              <div
+                v-if="group.breakIndex !== undefined"
+                class="cv-admin__break"
               >
-                ↑
-              </button>
-              <button
-                class="a-btn a-btn--icon"
-                title="Move down"
-                :disabled="i === variant.sections.length - 1"
-                @click="moveSection(i, 1)"
-              >
-                ↓
-              </button>
-              <button
-                class="a-btn a-btn--icon"
-                title="Remove break"
-                @click="removeSectionBreak(i)"
-              >
-                ✕
-              </button>
-            </div>
-            <div v-else class="mb-3">
-              <div class="cv-admin__row cv-admin__section">
-                <span class="cv-admin__label flex-grow-1 mb-0">
-                  {{ SECTION_LABELS[item.section] }}
-                  <span v-if="isSidebar(item.section)" class="cv-admin__tag">
-                    sidebar
-                  </span>
-                  <span v-if="sheetCount > 1" class="cv-admin__tag">
-                    p{{ sheetOf.get(`${i}`) }}
-                  </span>
-                </span>
-                <select
-                  class="form-select form-select-sm w-auto py-0"
-                  title="Order of the entries in this section"
-                  :value="item.order ?? 'manual'"
-                  @change="setOrder(i, orderValue($event))"
-                >
-                  <option value="manual">Manual order</option>
-                  <option value="date">Newest first</option>
-                </select>
+                <span class="flex-grow-1">— page break —</span>
                 <button
                   class="a-btn a-btn--icon"
-                  title="Move section up"
+                  title="Remove break"
+                  @click="removeSectionBreak(group.breakIndex)"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="cv-admin__columns">
+                <div class="cv-admin__column is-sidebar">
+                  <div class="cv-admin__column-title">Sidebar</div>
+                  <VariantSectionEditor
+                    v-for="i in group.sidebar"
+                    :key="i"
+                    :item="variant.sections[i] as VariantSection"
+                    :label="SECTION_LABELS[(variant.sections[i] as VariantSection).section]"
+                    :sheet="sheetCount > 1 ? sheetOf.get(`${i}`) : undefined"
+                    :sidebar="true"
+                    :can-up="columnTarget(i, -1) >= 0"
+                    :can-down="columnTarget(i, 1) >= 0"
+                    :ref-label="refLabel"
+                    @move="moveInColumn(i, $event)"
+                    @order="setOrder(i, $event)"
+                    @break-after="breakAfterSection(i)"
+                    @move-ref="(r, by) => moveRef(i, r, by)"
+                    @break-after-ref="breakAfterRef(i, $event)"
+                    @remove-ref-break="removeRefBreak(i, $event)"
+                    @remove-ref="removeRef(refId($event))"
+                  />
+                  <p v-if="!group.sidebar.length" class="small text-muted">
+                    Nothing here
+                  </p>
+                </div>
+                <div class="cv-admin__column">
+                  <div class="cv-admin__column-title">Main</div>
+                  <VariantSectionEditor
+                    v-for="i in group.main"
+                    :key="i"
+                    :item="variant.sections[i] as VariantSection"
+                    :label="SECTION_LABELS[(variant.sections[i] as VariantSection).section]"
+                    :sheet="sheetCount > 1 ? sheetOf.get(`${i}`) : undefined"
+                    :sidebar="false"
+                    :can-up="columnTarget(i, -1) >= 0"
+                    :can-down="columnTarget(i, 1) >= 0"
+                    :ref-label="refLabel"
+                    @move="moveInColumn(i, $event)"
+                    @order="setOrder(i, $event)"
+                    @break-after="breakAfterSection(i)"
+                    @move-ref="(r, by) => moveRef(i, r, by)"
+                    @break-after-ref="breakAfterRef(i, $event)"
+                    @remove-ref-break="removeRefBreak(i, $event)"
+                    @remove-ref="removeRef(refId($event))"
+                  />
+                  <p v-if="!group.main.length" class="small text-muted">
+                    Nothing here
+                  </p>
+                </div>
+              </div>
+            </template>
+          </template>
+
+          <!-- ATS layout: one column, in reading order -->
+          <template v-else>
+            <template v-for="(item, i) in variant.sections" :key="i">
+              <div v-if="isBreak(item)" class="cv-admin__break">
+                <span class="flex-grow-1">— page break —</span>
+                <button
+                  class="a-btn a-btn--icon"
+                  title="Move up"
                   :disabled="i === 0"
                   @click="moveSection(i, -1)"
                 >
@@ -938,7 +1012,7 @@ onBeforeRouteLeave(
                 </button>
                 <button
                   class="a-btn a-btn--icon"
-                  title="Move section down"
+                  title="Move down"
                   :disabled="i === variant.sections.length - 1"
                   @click="moveSection(i, 1)"
                 >
@@ -946,64 +1020,32 @@ onBeforeRouteLeave(
                 </button>
                 <button
                   class="a-btn a-btn--icon"
-                  title="Insert a page break after this section"
-                  @click="breakAfterSection(i)"
+                  title="Remove break"
+                  @click="removeSectionBreak(i)"
                 >
-                  ⤓
+                  ✕
                 </button>
               </div>
-              <template v-for="(ref, r) in item.refs" :key="r">
-                <div v-if="isBreak(ref)" class="cv-admin__break is-inner">
-                  <span class="flex-grow-1">
-                    — page break ({{ SECTION_LABELS[item.section] }} continues)
-                    —
-                  </span>
-                  <button
-                    class="a-btn a-btn--icon"
-                    title="Remove break"
-                    @click="removeRefBreak(i, r)"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div v-else class="cv-admin__row">
-                  <span class="flex-grow-1">{{ refLabel(ref) }}</span>
-                  <template v-if="item.order !== 'date'">
-                    <button
-                      class="a-btn a-btn--icon"
-                      title="Move up"
-                      :disabled="r === 0"
-                      @click="moveRef(i, r, -1)"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      class="a-btn a-btn--icon"
-                      title="Move down"
-                      :disabled="r === item.refs.length - 1"
-                      @click="moveRef(i, r, 1)"
-                    >
-                      ↓
-                    </button>
-                  </template>
-                  <button
-                    class="a-btn a-btn--icon"
-                    title="Insert a page break after this entry"
-                    @click="breakAfterRef(i, r)"
-                  >
-                    ⤓
-                  </button>
-                  <button
-                    class="a-btn a-btn--icon"
-                    title="Remove from this variant"
-                    @click="removeRef(refId(ref))"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </template>
-            </div>
+              <VariantSectionEditor
+                v-else
+                :item="item"
+                :label="SECTION_LABELS[item.section]"
+                :sheet="sheetCount > 1 ? sheetOf.get(`${i}`) : undefined"
+                :sidebar="isSidebar(item.section)"
+                :can-up="i > 0"
+                :can-down="i < variant.sections.length - 1"
+                :ref-label="refLabel"
+                @move="moveSection(i, $event)"
+                @order="setOrder(i, $event)"
+                @break-after="breakAfterSection(i)"
+                @move-ref="(r, by) => moveRef(i, r, by)"
+                @break-after-ref="breakAfterRef(i, $event)"
+                @remove-ref-break="removeRefBreak(i, $event)"
+                @remove-ref="removeRef(refId($event))"
+              />
+            </template>
           </template>
+
           <p v-if="!variant.sections.length" class="small text-muted">
             Nothing selected yet. Tick entries in the Library tab.
           </p>
@@ -1275,8 +1317,31 @@ onBeforeRouteLeave(
   }
 }
 
-.cv-admin__section {
-  border-bottom: 1px solid #cbd5e1;
+.cv-admin__columns {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) 3fr;
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.75rem;
+}
+
+.cv-admin__column {
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  background: #f8fafc;
+
+  &.is-sidebar {
+    background: #e8edf3;
+  }
+}
+
+.cv-admin__column-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.4rem;
 }
 
 .cv-admin__row {
