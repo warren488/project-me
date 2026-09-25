@@ -575,6 +575,15 @@ async function measureOverflow() {
 
 watch([preview, paged, zoom], measureOverflow);
 
+// The preview column is exactly as wide as the CV at the current zoom, so
+// the form gets everything else. A4 sheets and the ATS layout are 210mm wide;
+// the continuous styled view is capped at 1050px plus its own 20px gutters.
+const previewWidth = computed(() => {
+  const ats = variant.value?.layout === "ats";
+  const base = paged.value || ats ? "210mm" : "1090px";
+  return `calc(${base} * ${zoom.value} + 2rem)`;
+});
+
 const printCv = () => window.print();
 
 const warnOnUnload = (event: BeforeUnloadEvent) => {
@@ -1002,7 +1011,7 @@ onBeforeRouteLeave(
       </section>
 
       <!-- Preview -->
-      <section class="cv-admin__preview">
+      <section class="cv-admin__preview" :style="{ width: previewWidth }">
         <div class="d-flex gap-2 align-items-center mb-2 no-print">
           <strong class="small text-dark">Preview</strong>
           <select
@@ -1147,7 +1156,7 @@ onBeforeRouteLeave(
 
 .cv-admin__grid {
   display: grid;
-  grid-template-columns: minmax(360px, 520px) 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: start;
 }
@@ -1166,6 +1175,7 @@ onBeforeRouteLeave(
 
 .cv-admin__preview {
   background: #e2e8f0;
+  max-width: 100%;
 }
 
 .cv-admin__variant {
@@ -1335,6 +1345,10 @@ onBeforeRouteLeave(
   .cv-admin__panel,
   .cv-admin__preview {
     max-height: none;
+  }
+
+  .cv-admin__preview {
+    width: auto !important;
   }
 }
 
