@@ -269,6 +269,25 @@ const twoColumn = computed(
   () => (variant.value?.layout ?? "styled") === "styled"
 );
 
+// Collapsed sections in the Layout tab, by section name so the state
+// survives reordering and switching variants.
+const collapsed = ref(new Set<SectionName>());
+function toggleCollapsed(section: SectionName) {
+  const next = new Set(collapsed.value);
+  if (next.has(section)) next.delete(section);
+  else next.add(section);
+  collapsed.value = next;
+}
+function collapseAll(on: boolean) {
+  collapsed.value = new Set(
+    on
+      ? (variant.value?.sections ?? [])
+          .filter((s): s is VariantSection => !isBreak(s))
+          .map((s) => s.section)
+      : []
+  );
+}
+
 function selectedBullets(entry: LibraryEntry) {
   const at = placement.value.get(entry.id);
   if (!at) return [];
@@ -927,6 +946,14 @@ onBeforeRouteLeave(
             column alike, and a section that continues repeats its heading. Name
             and contact details only print on sheet 1.
           </p>
+          <div class="d-flex gap-2 mb-2 small">
+            <button class="cv-admin__link" @click="collapseAll(true)">
+              Collapse all
+            </button>
+            <button class="cv-admin__link" @click="collapseAll(false)">
+              Expand all
+            </button>
+          </div>
 
           <!-- Styled layout: sidebar and main side by side, as on the CV -->
           <template v-if="twoColumn">
@@ -957,6 +984,8 @@ onBeforeRouteLeave(
                     :can-up="columnTarget(i, -1) >= 0"
                     :can-down="columnTarget(i, 1) >= 0"
                     :ref-label="refLabel"
+                    :collapsed="collapsed.has((variant.sections[i] as VariantSection).section)"
+                    @toggle="toggleCollapsed((variant.sections[i] as VariantSection).section)"
                     @move="moveInColumn(i, $event)"
                     @order="setOrder(i, $event)"
                     @break-after="breakAfterSection(i)"
@@ -981,6 +1010,8 @@ onBeforeRouteLeave(
                     :can-up="columnTarget(i, -1) >= 0"
                     :can-down="columnTarget(i, 1) >= 0"
                     :ref-label="refLabel"
+                    :collapsed="collapsed.has((variant.sections[i] as VariantSection).section)"
+                    @toggle="toggleCollapsed((variant.sections[i] as VariantSection).section)"
                     @move="moveInColumn(i, $event)"
                     @order="setOrder(i, $event)"
                     @break-after="breakAfterSection(i)"
@@ -1035,6 +1066,8 @@ onBeforeRouteLeave(
                 :can-up="i > 0"
                 :can-down="i < variant.sections.length - 1"
                 :ref-label="refLabel"
+                :collapsed="collapsed.has(item.section)"
+                @toggle="toggleCollapsed(item.section)"
                 @move="moveSection(i, $event)"
                 @order="setOrder(i, $event)"
                 @break-after="breakAfterSection(i)"
@@ -1314,6 +1347,17 @@ onBeforeRouteLeave(
 
   &.is-inner {
     margin: 0.25rem 0;
+  }
+}
+
+.cv-admin__link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #2563eb;
+
+  &:hover {
+    text-decoration: underline;
   }
 }
 
