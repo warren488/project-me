@@ -2,11 +2,11 @@
 import { computed, PropType } from "vue";
 import { CVPage, SectionName, SIDEBAR_SECTIONS } from "@/cv/types";
 
-// One CV page: sidebar (first sheet only) plus the main column, rendering
-// sections in the order the variant chose.
+// One CV page: sidebar plus main column, rendering sections in the order the
+// variant chose. The name and contact block only appears on the first sheet.
 const props = defineProps({
   page: { type: Object as PropType<CVPage>, required: true },
-  sidebar: { type: Boolean, default: true },
+  first: { type: Boolean, default: true },
 });
 
 const sidebarSections = computed(() =>
@@ -15,17 +15,14 @@ const sidebarSections = computed(() =>
 const mainSections = computed(() =>
   props.page.sections.filter((s) => !SIDEBAR_SECTIONS.includes(s))
 );
-const showSidebar = computed(
-  () => props.sidebar && sidebarSections.value.length > 0
-);
 const cont = (s: SectionName) =>
   props.page.continued?.includes(s) ? " (continued)" : "";
 </script>
 
 <template>
-  <section class="cv-page" :class="{ 'cv-page--no-sidebar': !showSidebar }">
-    <aside v-if="showSidebar" class="sidebar">
-      <div class="sidebar-personal-info">
+  <section class="cv-page">
+    <aside class="sidebar">
+      <div v-if="first" class="sidebar-personal-info">
         <div class="profile-header">
           <h1>{{ page.profile.name }}</h1>
           <h2>{{ page.profile.title }}</h2>
@@ -204,10 +201,6 @@ const cont = (s: SectionName) =>
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   overflow: hidden;
-}
-
-.cv-page--no-sidebar {
-  grid-template-columns: 1fr;
 }
 
 * {

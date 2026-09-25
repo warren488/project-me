@@ -131,13 +131,12 @@ const sheetOf = computed(() => {
       return;
     }
     map.set(`${i}`, sheet);
-    const sidebar = SIDEBAR_SECTIONS.includes(item.section);
     item.refs.forEach((ref, index) => {
       if (isBreak(ref)) {
-        if (!sidebar) sheet++;
+        sheet++;
         return;
       }
-      map.set(`${i}/${index}`, sidebar ? 1 : sheet);
+      map.set(`${i}/${index}`, sheet);
     });
   });
   return map;
@@ -192,7 +191,7 @@ const moveSection = (i: number, by: number) =>
 const moveRef = (i: number, index: number, by: number) =>
   swap(sectionItem(i)?.refs, index, by);
 
-// Page breaks: between sections, or after a ref of a main-column section.
+// Page breaks: between sections, or after a ref inside a section.
 function breakAfterSection(i: number) {
   variant.value?.sections.splice(i + 1, 0, { ...BREAK });
 }
@@ -846,9 +845,10 @@ onBeforeRouteLeave(
         <!-- Layout: one ordered list of sections, cut into sheets by breaks -->
         <div v-else>
           <p class="small text-muted">
-            Most important first. Sidebar sections always print on sheet 1; page
-            breaks cut the main column into sheets, and a section that continues
-            on the next sheet repeats its heading.
+            Most important first. Page breaks cut the list into printed sheets:
+            everything after a break goes to the next sheet, sidebar or main
+            column alike, and a section that continues repeats its heading. Name
+            and contact details only print on sheet 1.
           </p>
           <template v-for="(item, i) in variant.sections" :key="i">
             <div v-if="isBreak(item)" class="cv-admin__break">
@@ -884,7 +884,7 @@ onBeforeRouteLeave(
                   <span v-if="isSidebar(item.section)" class="cv-admin__tag">
                     sidebar
                   </span>
-                  <span v-else-if="sheetCount > 1" class="cv-admin__tag">
+                  <span v-if="sheetCount > 1" class="cv-admin__tag">
                     p{{ sheetOf.get(`${i}`) }}
                   </span>
                 </span>
@@ -945,7 +945,6 @@ onBeforeRouteLeave(
                     ↓
                   </button>
                   <button
-                    v-if="!isSidebar(item.section)"
                     class="a-btn a-btn--icon"
                     title="Insert a page break after this entry"
                     @click="breakAfterRef(i, r)"

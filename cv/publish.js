@@ -51,8 +51,9 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
-// Sections that live in the sidebar of the styled layout. They only ever
-// appear on the first sheet; later sheets are a full-width main column.
+// Sections that live in the sidebar of the styled layout. The sidebar flows
+// across sheets like the main column; only the name and contact block is
+// limited to the first sheet.
 const SIDEBAR_SECTIONS = [
   "education",
   "competencies",
@@ -75,7 +76,8 @@ function eachRef(variant, fn) {
 
 // A variant is one ordered list of sections, each with ordered refs. Page
 // breaks ({ break: true }) can sit between sections or between the refs of a
-// main-column section; the sheet after a mid-section break repeats that
+// section; everything after a break lands on the next sheet, whichever
+// column it belongs to, and the sheet after a mid-section break repeats that
 // section's heading as "(continued)". The result is one CVPage per sheet.
 function resolveVariant(library, variant) {
   const byId = new Map(library.entries.map((e) => [e.id, e]));
@@ -120,7 +122,6 @@ function resolveVariant(library, variant) {
   // sheet = { order: [section...], items: { section: [{entry, ref}] }, continued: Set }
   const newSheet = () => ({ order: [], items: {}, continued: new Set() });
   const sheets = [newSheet()];
-  const first = sheets[0];
   const started = new Set(); // sections that already have items on an earlier sheet
   const seenSection = new Set();
 
@@ -131,9 +132,7 @@ function resolveVariant(library, variant) {
   const cut = () => {
     const current = sheets[sheets.length - 1];
     if (current.order.length || sheets.length > 1) sheets.push(newSheet());
-    for (const section of current.order) {
-      if (!SIDEBAR_SECTIONS.includes(section)) started.add(section);
-    }
+    for (const section of current.order) started.add(section);
   };
 
   for (const item of variant.sections) {
@@ -150,15 +149,14 @@ function resolveVariant(library, variant) {
     if (!Array.isArray(item.refs))
       throw new Error(`${where}: section "${section}" has no refs list`);
 
-    const sidebar = SIDEBAR_SECTIONS.includes(section);
     for (const ref of item.refs) {
       if (isBreak(ref)) {
-        if (!sidebar) cut(); // the sidebar is never cut
+        cut();
         continue;
       }
-      const target = sidebar ? first : sheets[sheets.length - 1];
+      const target = sheets[sheets.length - 1];
       add(target, section, lookup(ref, section));
-      if (!sidebar && started.has(section)) target.continued.add(section);
+      if (started.has(section)) target.continued.add(section);
     }
   }
   // Drop an empty trailing sheet left by a final break.

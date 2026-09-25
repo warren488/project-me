@@ -132,7 +132,7 @@ export type SectionName =
   | "experience"
   | "projects";
 
-// Sections that render in the sidebar of the styled layout (first sheet only).
+// Sections that render in the sidebar of the styled layout.
 export const SIDEBAR_SECTIONS: SectionName[] = [
   "education",
   "competencies",

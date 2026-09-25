@@ -14,7 +14,6 @@
         "education",
         "competencies",
         "achievements",
-        "interests",
         "skills",
         "experience"
       ],
@@ -50,20 +49,6 @@
           "role": "Submitted Academic Research Paper (Under Review)",
           "org": "Emerging Networks and Services in Developing Nations -- Barbados Use Case",
           "note": "Co-authored with Supervising Professor, Dr. Milena Radenkovic"
-        }
-      ],
-      "interests": [
-        {
-          "name": "Hardware Tinkering",
-          "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
-        },
-        {
-          "name": "Cricket",
-          "desc": "Competitive play & Captaincy"
-        },
-        {
-          "name": "PWA Research",
-          "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
         }
       ],
       "skills": {
@@ -131,6 +116,7 @@
       },
       "sections": [
         "experience",
+        "interests",
         "projects"
       ],
       "continued": [
@@ -145,6 +131,20 @@
             "Designed and deployed a critical internal RESTful API central to daily operations.",
             "Developed serverless microservices using AWS Lambda and API Gateway."
           ]
+        }
+      ],
+      "interests": [
+        {
+          "name": "Hardware Tinkering",
+          "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
+        },
+        {
+          "name": "Cricket",
+          "desc": "Competitive play & Captaincy"
+        },
+        {
+          "name": "PWA Research",
+          "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
         }
       ],
       "projects": [

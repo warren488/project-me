@@ -30,7 +30,7 @@ const merged = computed(() => mergePages(props.pages));
         v-for="(page, index) in pages"
         :key="index"
         :page="page"
-        :sidebar="index === 0"
+        :first="index === 0"
         :class="{ 'cv-page--last': index === pages.length - 1 }"
       />
     </div>
