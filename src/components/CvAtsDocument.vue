@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, PropType } from "vue";
 import { CVPage } from "@/cv/types";
+import { usePrintPage } from "@/cv/usePrintPage";
+
+usePrintPage("size: A4; margin: 18mm 20mm;");
 
 // A plain, single-column CV for applicant tracking systems: conventional
 // headings, no columns, tables, icons or pills, and contact details in the
@@ -201,12 +204,8 @@ const contactLine = computed(() =>
 }
 
 @media print {
-  @page {
-    size: A4;
-    margin: 18mm 20mm;
-  }
-
   :global(nav),
+  :global(header),
   :global(footer),
   :global(.no-print) {
     display: none !important;

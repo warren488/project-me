@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { defineProps, PropType } from "vue";
 import { CVPage } from "@/cv/types";
+import { usePrintPage } from "@/cv/usePrintPage";
+
+// The sidebar bleeds to the paper edge, so print with no page margin.
+usePrintPage("size: A4; margin: 0;");
 
 defineProps({
   pages: { type: Array as PropType<CVPage[]>, required: true },
@@ -547,21 +551,18 @@ defineProps({
 
 /* Print Overrides */
 @media print {
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
   .cv-container {
     max-width: none;
-    width: auto;
+    width: 100%;
   }
 
-  /* One sheet per page, clipped, with a hard break after each. */
+  /* One sheet per page, clipped, with a hard break after each. Sized to the
+     printable area (100vh is one page in print) rather than fixed mm, so it
+     fits whatever paper and margins the print dialog ends up with. */
   .cv-page,
   .cv-wrapper.is-paged .cv-page {
-    width: 210mm;
-    height: 297mm;
+    width: 100%;
+    height: 100vh;
     margin: 0;
     border-radius: 0;
     box-shadow: none;
@@ -595,6 +596,7 @@ defineProps({
 
   /* Hide external things if this is inside a larger layout */
   :global(nav),
+  :global(header),
   :global(footer),
   :global(.no-print) {
     display: none !important;
