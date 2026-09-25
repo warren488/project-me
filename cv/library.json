@@ -13,7 +13,7 @@
       "title": "Software Engineering Consultant",
       "org": "The RAD Consulting Group",
       "start": "2022-10",
-      "end": null,
+      "end": "2026-10",
       "tags": ["fullstack", "devops"],
       "bullets": [
         {
@@ -321,6 +321,14 @@
       "org": "Harrison College",
       "start": "2012-09",
       "end": "2014-09",
+      "tags": []
+    },
+    {
+      "id": "proj-fitnese",
+      "kind": "project",
+      "title": "Fitnese",
+      "details": "Fitnese is an activity tracking app focused on detailed exercise metadata, injury risk tracking, rehabilitation benefits, and offline-first functionality.",
+      "tech": "capacitor vue PWA",
       "tags": []
     }
   ]

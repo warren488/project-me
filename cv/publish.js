@@ -61,8 +61,39 @@ const SIDEBAR_SECTIONS = [
   "interests",
 ];
 
+// "2021-09" -> 24261; a bare year counts as January of that year.
+const monthIndex = (date) => {
+  const [y, m] = date.split("-").map(Number);
+  return y * 12 + ((m || 1) - 1);
+};
+
+const SECTION_ORDERS = ["manual", "date"];
+
 const isBreak = (item) =>
   !!item && typeof item === "object" && item.break === true;
+
+// Newest first, current roles ahead of finished ones started the same
+// month, undated entries last in their existing order. Page breaks keep their
+// positions. Mirrors src/cv/order.ts.
+function sortRefsByDate(refs, byId) {
+  const key = (ref) => {
+    const entry = byId.get(typeof ref === "string" ? ref : ref.id);
+    if (!entry || !entry.start) return null;
+    return [monthIndex(entry.start), entry.end === null ? 1 : 0];
+  };
+  const sorted = refs
+    .filter((r) => !isBreak(r))
+    .map((ref, i) => ({ ref, i, k: key(ref) }))
+    .sort((a, b) => {
+      if (!a.k && !b.k) return a.i - b.i;
+      if (!a.k) return 1;
+      if (!b.k) return -1;
+      return b.k[0] - a.k[0] || b.k[1] - a.k[1] || a.i - b.i;
+    })
+    .map((x) => x.ref);
+  let n = 0;
+  return refs.map((r) => (isBreak(r) ? r : sorted[n++]));
+}
 
 // Calls fn(ref, sectionName) for every entry reference in a variant.
 function eachRef(variant, fn) {
@@ -148,8 +179,13 @@ function resolveVariant(library, variant) {
     seenSection.add(section);
     if (!Array.isArray(item.refs))
       throw new Error(`${where}: section "${section}" has no refs list`);
+    if (item.order !== undefined && !SECTION_ORDERS.includes(item.order)) {
+      throw new Error(`${where}: unknown order "${item.order}" in ${section}`);
+    }
+    const refs =
+      item.order === "date" ? sortRefsByDate(item.refs, byId) : item.refs;
 
-    for (const ref of item.refs) {
+    for (const ref of refs) {
       if (isBreak(ref)) {
         cut();
         continue;
@@ -239,12 +275,6 @@ const onTimeline = (entry) =>
 
 // The public timeline: dated entries only, most recent first, without any
 // contact details.
-// "2021-09" -> 24261; a bare year counts as January of that year.
-const monthIndex = (date) => {
-  const [y, m] = date.split("-").map(Number);
-  return y * 12 + ((m || 1) - 1);
-};
-
 function resolveTimeline(library) {
   const endOf = (e) => (e.end ? monthIndex(e.end) : Infinity);
   return library.entries

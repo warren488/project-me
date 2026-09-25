@@ -8,6 +8,7 @@ import {
   watch,
 } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
+import { sortRefsByDate } from "@/cv/order";
 import CvAtsDocument from "@/components/CvAtsDocument.vue";
 import CvDocument from "@/components/CvDocument.vue";
 import EntryEditor from "@/components/EntryEditor.vue";
@@ -20,6 +21,7 @@ import {
   PageBreak,
   Profile,
   SectionName,
+  SectionOrder,
   SIDEBAR_SECTIONS,
   Variant,
   VariantRef,
@@ -177,7 +179,22 @@ function addRef(ref: VariantRef) {
     variant.value.sections.push(item);
   }
   item.refs.push(ref);
+  if (item.order === "date") sortRefsByDate(item.refs, byId.value);
 }
+
+// Date-ordered sections are kept sorted in the stored list too, so the Layout
+// tab shows exactly the order that prints and page breaks land where shown.
+function setOrder(i: number, order: SectionOrder) {
+  const item = sectionItem(i);
+  if (!item) return;
+  if (order === "manual") delete item.order;
+  else {
+    item.order = order;
+    sortRefsByDate(item.refs, byId.value);
+  }
+}
+const orderValue = (event: Event) =>
+  (event.target as HTMLSelectElement).value as SectionOrder;
 
 // Swap with a neighbour. Moving an entry past a page break moves it to the
 // other sheet; moving a section past a break does the same for the section.
@@ -293,6 +310,11 @@ function openEditor(entry: LibraryEntry | null) {
 // an entry whose kind changed to the matching section.
 function reconcileVariant() {
   if (!variant.value) return;
+  for (const item of variant.value.sections) {
+    if (!isBreak(item) && item.order === "date") {
+      sortRefsByDate(item.refs, byId.value);
+    }
+  }
   for (const [id, at] of [...placement.value]) {
     const entry = byId.value.get(id);
     if (!entry) {
@@ -888,6 +910,15 @@ onBeforeRouteLeave(
                     p{{ sheetOf.get(`${i}`) }}
                   </span>
                 </span>
+                <select
+                  class="form-select form-select-sm w-auto py-0"
+                  title="Order of the entries in this section"
+                  :value="item.order ?? 'manual'"
+                  @change="setOrder(i, orderValue($event))"
+                >
+                  <option value="manual">Manual order</option>
+                  <option value="date">Newest first</option>
+                </select>
                 <button
                   class="a-btn a-btn--icon"
                   title="Move section up"
@@ -928,22 +959,24 @@ onBeforeRouteLeave(
                 </div>
                 <div v-else class="cv-admin__row">
                   <span class="flex-grow-1">{{ refLabel(ref) }}</span>
-                  <button
-                    class="a-btn a-btn--icon"
-                    title="Move up"
-                    :disabled="r === 0"
-                    @click="moveRef(i, r, -1)"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    class="a-btn a-btn--icon"
-                    title="Move down"
-                    :disabled="r === item.refs.length - 1"
-                    @click="moveRef(i, r, 1)"
-                  >
-                    ↓
-                  </button>
+                  <template v-if="item.order !== 'date'">
+                    <button
+                      class="a-btn a-btn--icon"
+                      title="Move up"
+                      :disabled="r === 0"
+                      @click="moveRef(i, r, -1)"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      class="a-btn a-btn--icon"
+                      title="Move down"
+                      :disabled="r === item.refs.length - 1"
+                      @click="moveRef(i, r, 1)"
+                    >
+                      ↓
+                    </button>
+                  </template>
                   <button
                     class="a-btn a-btn--icon"
                     title="Insert a page break after this entry"

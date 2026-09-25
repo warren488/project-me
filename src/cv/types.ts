@@ -153,8 +153,11 @@ export const isBreak = (item: unknown): item is PageBreak =>
   item !== null &&
   (item as PageBreak).break === true;
 
+export type SectionOrder = "manual" | "date";
+
 export interface VariantSection {
   section: SectionName;
+  order?: SectionOrder; // "date" = newest first (default manual)
   refs: (VariantRef | PageBreak)[];
 }
 
