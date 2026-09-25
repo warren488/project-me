@@ -51,9 +51,42 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+// Sections that live in the sidebar of the styled layout. They only ever
+// appear on the first sheet; later sheets are a full-width main column.
+const SIDEBAR_SECTIONS = [
+  "education",
+  "competencies",
+  "achievements",
+  "interests",
+];
+
+const isBreak = (item) =>
+  !!item && typeof item === "object" && item.break === true;
+
+// Calls fn(ref, sectionName) for every entry reference in a variant.
+function eachRef(variant, fn) {
+  for (const item of variant.sections || []) {
+    if (isBreak(item)) continue;
+    for (const ref of item.refs || []) {
+      if (!isBreak(ref)) fn(ref, item.section);
+    }
+  }
+}
+
+// A variant is one ordered list of sections, each with ordered refs. Page
+// breaks ({ break: true }) can sit between sections or between the refs of a
+// main-column section; the sheet after a mid-section break repeats that
+// section's heading as "(continued)". The result is one CVPage per sheet.
 function resolveVariant(library, variant) {
   const byId = new Map(library.entries.map((e) => [e.id, e]));
   const where = `variant "${variant.id}"`;
+
+  if (variant.layout !== undefined && !LAYOUTS.includes(variant.layout)) {
+    throw new Error(`${where}: unknown layout "${variant.layout}"`);
+  }
+  if (!Array.isArray(variant.sections)) {
+    throw new Error(`${where}: "sections" must be a list`);
+  }
 
   const lookup = (ref, section) => {
     const id = typeof ref === "string" ? ref : ref.id;
@@ -83,73 +116,114 @@ function resolveVariant(library, variant) {
     });
   };
 
-  if (variant.layout !== undefined && !LAYOUTS.includes(variant.layout)) {
-    throw new Error(`${where}: unknown layout "${variant.layout}"`);
+  // --- Cut the list into sheets ---
+  // sheet = { order: [section...], items: { section: [{entry, ref}] }, continued: Set }
+  const newSheet = () => ({ order: [], items: {}, continued: new Set() });
+  const sheets = [newSheet()];
+  const first = sheets[0];
+  const started = new Set(); // sections that already have items on an earlier sheet
+  const seenSection = new Set();
+
+  const add = (sheet, section, resolved) => {
+    if (!sheet.order.includes(section)) sheet.order.push(section);
+    (sheet.items[section] = sheet.items[section] || []).push(resolved);
+  };
+  const cut = () => {
+    const current = sheets[sheets.length - 1];
+    if (current.order.length || sheets.length > 1) sheets.push(newSheet());
+    for (const section of current.order) {
+      if (!SIDEBAR_SECTIONS.includes(section)) started.add(section);
+    }
+  };
+
+  for (const item of variant.sections) {
+    if (isBreak(item)) {
+      cut();
+      continue;
+    }
+    const { section } = item;
+    if (!SECTION_KINDS[section])
+      throw new Error(`${where}: unknown section "${section}"`);
+    if (seenSection.has(section))
+      throw new Error(`${where}: section "${section}" is listed twice`);
+    seenSection.add(section);
+    if (!Array.isArray(item.refs))
+      throw new Error(`${where}: section "${section}" has no refs list`);
+
+    const sidebar = SIDEBAR_SECTIONS.includes(section);
+    for (const ref of item.refs) {
+      if (isBreak(ref)) {
+        if (!sidebar) cut(); // the sidebar is never cut
+        continue;
+      }
+      const target = sidebar ? first : sheets[sheets.length - 1];
+      add(target, section, lookup(ref, section));
+      if (!sidebar && started.has(section)) target.continued.add(section);
+    }
   }
+  // Drop an empty trailing sheet left by a final break.
+  while (sheets.length > 1 && !sheets[sheets.length - 1].order.length) {
+    sheets.pop();
+  }
+
+  // --- Render each sheet as a CVPage ---
   const { name, email, website, phone, location } = library.profile;
 
-  return variant.pages.map((page, index) => {
-    for (const section of Object.keys(page)) {
-      if (!SECTION_KINDS[section])
-        throw new Error(`${where}: unknown section "${section}"`);
-    }
-    const items = (section) =>
-      (page[section] || []).map((ref) => lookup(ref, section));
+  return sheets.map((sheet, index) => {
     const out = {
       profile: { name, title: variant.title, email, website },
+      sections: sheet.order,
     };
     if (variant.contact) {
       if (phone) out.profile.phone = phone;
       if (location) out.profile.location = location;
     }
     if (index === 0 && variant.summary) out.profile.summary = variant.summary;
+    if (sheet.continued.size) out.continued = [...sheet.continued];
 
-    if (page.education) {
-      out.education = items("education").map(({ entry }) => ({
-        degree: entry.title,
-        uni: entry.org,
-        dates: formatRange(entry),
-        details: entry.details,
-      }));
-    }
-    if (page.competencies) {
-      out.competencies = items("competencies").map(({ entry }) => entry.title);
-    }
-    if (page.achievements) {
-      out.achievements = items("achievements").map(({ entry }) => ({
-        role: entry.title,
-        org: entry.org,
-        note: entry.details,
-      }));
-    }
-    if (page.skills) {
-      // Grouped by category, in the order categories first appear.
-      out.skills = {};
-      for (const { entry } of items("skills")) {
-        if (!out.skills[entry.category]) out.skills[entry.category] = [];
-        out.skills[entry.category].push(entry.title);
+    const items = (section) => sheet.items[section] || [];
+    for (const section of sheet.order) {
+      if (section === "education") {
+        out.education = items(section).map(({ entry }) => ({
+          degree: entry.title,
+          uni: entry.org,
+          dates: formatRange(entry),
+          details: entry.details,
+        }));
+      } else if (section === "competencies") {
+        out.competencies = items(section).map(({ entry }) => entry.title);
+      } else if (section === "achievements") {
+        out.achievements = items(section).map(({ entry }) => ({
+          role: entry.title,
+          org: entry.org,
+          note: entry.details,
+        }));
+      } else if (section === "skills") {
+        // Grouped by category, in the order categories first appear.
+        out.skills = {};
+        for (const { entry } of items(section)) {
+          if (!out.skills[entry.category]) out.skills[entry.category] = [];
+          out.skills[entry.category].push(entry.title);
+        }
+      } else if (section === "experience") {
+        out.experience = items(section).map(({ entry, ref }) => ({
+          title: entry.title,
+          company: entry.org,
+          dates: formatRange(entry),
+          details: pickBullets(entry, ref),
+        }));
+      } else if (section === "interests") {
+        out.interests = items(section).map(({ entry }) => ({
+          name: entry.title,
+          desc: entry.details,
+        }));
+      } else if (section === "projects") {
+        out.projects = items(section).map(({ entry }) => ({
+          title: entry.title,
+          desc: entry.details,
+          tech: entry.tech,
+        }));
       }
-    }
-    if (page.experience) {
-      out.experience = items("experience").map(({ entry, ref }) => ({
-        title: entry.title,
-        company: entry.org,
-        dates: formatRange(entry),
-        details: pickBullets(entry, ref),
-      }));
-    }
-    if (page.interests) {
-      out.interests = items("interests").map(({ entry }) => ({
-        name: entry.title,
-        desc: entry.details,
-      }));
-    }
-    if (page.projects) {
-      out.projects = items("projects").map(({ entry }) => ({
-        title: entry.title,
-        desc: entry.details,
-        tech: entry.tech,
-      }));
     }
     return out;
   });
@@ -229,6 +303,9 @@ function publish(variantId = "full") {
 
 module.exports = {
   resolveVariant,
+  eachRef,
+  isBreak,
+  SIDEBAR_SECTIONS,
   resolveTimeline,
   publish,
   publishTimeline,

@@ -15,11 +15,15 @@ import {
   CVPage,
   EntryKind,
   EntryUsage,
+  isBreak,
   LibraryEntry,
+  PageBreak,
   Profile,
   SectionName,
+  SIDEBAR_SECTIONS,
   Variant,
   VariantRef,
+  VariantSection,
 } from "@/cv/types";
 
 interface State {
@@ -32,11 +36,13 @@ interface State {
 }
 
 interface Placement {
-  page: number;
+  item: number; // index in variant.sections
   section: SectionName;
-  index: number;
+  index: number; // index in that section's refs
   ref: VariantRef;
 }
+
+const BREAK: PageBreak = { break: true };
 
 type GroupBy = "kind" | "org" | "year" | "tag";
 
@@ -51,16 +57,6 @@ const KIND_LABELS: Record<EntryKind, string> = {
 };
 const KIND_ORDER = Object.keys(KIND_LABELS) as EntryKind[];
 
-// The order CvDocument renders sections in (sidebar first, then main column).
-const SECTION_ORDER: SectionName[] = [
-  "education",
-  "competencies",
-  "achievements",
-  "interests",
-  "skills",
-  "experience",
-  "projects",
-];
 const SECTION_LABELS: Record<SectionName, string> = {
   education: "Education",
   competencies: "Competencies",
@@ -93,7 +89,6 @@ const tab = ref<"library" | "layout">("library");
 const groupBy = ref<GroupBy>("kind");
 const search = ref("");
 const onlySelected = ref(false);
-const targetPage = ref(0);
 const zoom = ref(0.6);
 const paged = ref(true); // preview as A4 sheets so overflow is visible
 
@@ -115,54 +110,102 @@ const refId = (ref: VariantRef) => (typeof ref === "string" ? ref : ref.id);
 // Where each selected entry currently sits in the variant.
 const placement = computed(() => {
   const map = new Map<string, Placement>();
-  variant.value?.pages.forEach((page, p) =>
-    SECTION_ORDER.forEach((section) =>
-      (page[section] ?? []).forEach((ref, index) =>
-        map.set(refId(ref), { page: p, section, index, ref })
-      )
-    )
-  );
+  variant.value?.sections.forEach((item, i) => {
+    if (isBreak(item)) return;
+    item.refs.forEach((ref, index) => {
+      if (!isBreak(ref)) {
+        map.set(refId(ref), { item: i, section: item.section, index, ref });
+      }
+    });
+  });
   return map;
 });
 
+// Which printed sheet each section item / ref lands on (1-based), for labels.
+const sheetOf = computed(() => {
+  const map = new Map<string, number>(); // key: `${item}` or `${item}/${index}`
+  let sheet = 1;
+  variant.value?.sections.forEach((item, i) => {
+    if (isBreak(item)) {
+      sheet++;
+      return;
+    }
+    map.set(`${i}`, sheet);
+    const sidebar = SIDEBAR_SECTIONS.includes(item.section);
+    item.refs.forEach((ref, index) => {
+      if (isBreak(ref)) {
+        if (!sidebar) sheet++;
+        return;
+      }
+      map.set(`${i}/${index}`, sidebar ? 1 : sheet);
+    });
+  });
+  return map;
+});
+
+const sheetCount = computed(
+  () => (variant.value ? preview.value.length : 0) || 1
+);
+
 // --- Editing the selection ---
+const sectionItem = (i: number) =>
+  variant.value?.sections[i] as VariantSection | undefined;
+
 function removeRef(id: string) {
   const at = placement.value.get(id);
-  if (!at || !variant.value) return;
-  const page = variant.value.pages[at.page];
-  const list = page[at.section] ?? [];
-  const [removed] = list.splice(at.index, 1);
-  // Drop empty sections so the CV doesn't render an empty heading.
-  if (!list.length) delete page[at.section];
-  return removed;
+  const item = at && sectionItem(at.item);
+  if (!at || !item || !variant.value) return;
+  const [removed] = item.refs.splice(at.index, 1);
+  // Drop a section with no entries left (breaks inside it go too), so the
+  // CV doesn't render an empty heading.
+  if (!item.refs.some((r) => !isBreak(r))) {
+    variant.value.sections.splice(at.item, 1);
+  }
+  return removed as VariantRef;
 }
 
-function addRef(ref: VariantRef, pageIndex: number) {
+// Appends to the entry's section, creating the section at the end of the
+// list if the variant doesn't have it yet.
+function addRef(ref: VariantRef) {
   const entry = byId.value.get(refId(ref));
   if (!entry || !variant.value) return;
-  const page = variant.value.pages[pageIndex];
   const section = sectionForKind.value[entry.kind];
-  const list = page[section] ?? [];
-  list.push(ref);
-  page[section] = list;
+  let item = variant.value.sections.find(
+    (s): s is VariantSection => !isBreak(s) && s.section === section
+  );
+  if (!item) {
+    item = { section, refs: [] };
+    variant.value.sections.push(item);
+  }
+  item.refs.push(ref);
 }
 
-function moveToPage(id: string, pageIndex: number) {
-  const ref = removeRef(id);
-  if (ref) addRef(ref, pageIndex);
-}
-
-function move(
-  pageIndex: number,
-  section: SectionName,
-  index: number,
-  by: number
-) {
-  const list = variant.value?.pages[pageIndex][section];
+// Swap with a neighbour. Moving an entry past a page break moves it to the
+// other sheet; moving a section past a break does the same for the section.
+function swap<T>(list: T[] | undefined, index: number, by: number) {
   const to = index + by;
   if (!list || to < 0 || to >= list.length) return;
   [list[index], list[to]] = [list[to], list[index]];
 }
+const moveSection = (i: number, by: number) =>
+  swap(variant.value?.sections, i, by);
+const moveRef = (i: number, index: number, by: number) =>
+  swap(sectionItem(i)?.refs, index, by);
+
+// Page breaks: between sections, or after a ref of a main-column section.
+function breakAfterSection(i: number) {
+  variant.value?.sections.splice(i + 1, 0, { ...BREAK });
+}
+function breakAfterRef(i: number, index: number) {
+  sectionItem(i)?.refs.splice(index + 1, 0, { ...BREAK });
+}
+function removeSectionBreak(i: number) {
+  variant.value?.sections.splice(i, 1);
+}
+function removeRefBreak(i: number, index: number) {
+  sectionItem(i)?.refs.splice(index, 1);
+}
+const isSidebar = (section: SectionName) => SIDEBAR_SECTIONS.includes(section);
 
 function selectedBullets(entry: LibraryEntry) {
   const at = placement.value.get(entry.id);
@@ -181,18 +224,17 @@ function toggleBullet(entry: LibraryEntry, bulletId: string, on: boolean) {
   else chosen.delete(bulletId);
   const all = (entry.bullets ?? []).map((b) => b.id);
   const bullets = all.filter((id) => chosen.has(id));
-  const list = variant.value.pages[at.page][at.section] ?? [];
+  const list = sectionItem(at.item)?.refs;
+  if (!list) return;
   // Plain id means "all bullets", which keeps new library bullets included.
   list[at.index] =
     bullets.length === all.length ? entry.id : { id: entry.id, bullets };
 }
 
 const checked = (event: Event) => (event.target as HTMLInputElement).checked;
-const selectValue = (event: Event) =>
-  Number((event.target as HTMLSelectElement).value);
 
 function onToggleEntry(entry: LibraryEntry, event: Event) {
-  if (checked(event)) addRef(entry.id, targetPage.value);
+  if (checked(event)) addRef(entry.id);
   else removeRef(entry.id);
 }
 
@@ -222,34 +264,6 @@ const saveProfile = () =>
     profileForm.value = null;
     flash("Profile saved");
   });
-
-// --- Pages ---
-function addPage() {
-  if (!variant.value) return;
-  variant.value.pages.push({});
-  targetPage.value = variant.value.pages.length - 1;
-}
-
-function removePage(index: number) {
-  const pages = variant.value?.pages;
-  if (!pages || pages.length < 2) return;
-  const count = SECTION_ORDER.reduce(
-    (n, s) => n + (pages[index][s]?.length ?? 0),
-    0
-  );
-  if (
-    count &&
-    !confirm(
-      `Page ${index + 1} has ${count} item${
-        count > 1 ? "s" : ""
-      }. Remove the page and drop them from this variant?`
-    )
-  ) {
-    return;
-  }
-  pages.splice(index, 1);
-  targetPage.value = Math.min(targetPage.value, pages.length - 1);
-}
 
 // --- Library entries (add / edit / delete) ---
 const editor = ref<{ entry: LibraryEntry | null } | null>(null);
@@ -288,15 +302,15 @@ function reconcileVariant() {
     }
     if (at.section !== sectionForKind.value[entry.kind]) {
       const ref = removeRef(id);
-      if (ref) addRef(typeof ref === "string" ? ref : ref.id, at.page);
+      if (ref) addRef(typeof ref === "string" ? ref : ref.id);
       continue;
     }
     if (typeof at.ref !== "string" && at.ref.bullets) {
       const have = new Set((entry.bullets ?? []).map((b) => b.id));
       const kept = at.ref.bullets.filter((b) => have.has(b));
       if (kept.length !== at.ref.bullets.length) {
-        const list = variant.value.pages[at.page][at.section] ?? [];
-        list[at.index] = kept.length ? { id, bullets: kept } : id;
+        const list = sectionItem(at.item)?.refs;
+        if (list) list[at.index] = kept.length ? { id, bullets: kept } : id;
       }
     }
   }
@@ -431,7 +445,6 @@ async function loadVariant(id: string) {
   const loaded = await api<Variant>(`variants/${id}`);
   variant.value = loaded;
   savedSnapshot.value = JSON.stringify(loaded);
-  targetPage.value = 0;
 }
 
 function onSwitchVariant(event: Event) {
@@ -732,17 +745,6 @@ onBeforeRouteLeave(
               + New entry
             </button>
           </div>
-          <div v-if="variant.pages.length > 1" class="small text-muted mb-2">
-            Newly ticked items go on
-            <select
-              v-model.number="targetPage"
-              class="form-select form-select-sm d-inline-block w-auto"
-            >
-              <option v-for="(_, i) in variant.pages" :key="i" :value="i">
-                page {{ i + 1 }}
-              </option>
-            </select>
-          </div>
 
           <div v-for="(group, g) in groups" :key="group.label" class="mb-3">
             <h6 class="cv-admin__group">
@@ -804,16 +806,19 @@ onBeforeRouteLeave(
                 >
                   ✎
                 </button>
-                <select
-                  v-if="placement.has(entry.id) && variant.pages.length > 1"
-                  class="form-select form-select-sm w-auto"
-                  :value="placement.get(entry.id)?.page"
-                  @change="moveToPage(entry.id, selectValue($event))"
+                <span
+                  v-if="placement.has(entry.id) && sheetCount > 1"
+                  class="cv-admin__tag"
+                  title="Printed sheet"
                 >
-                  <option v-for="(_, i) in variant.pages" :key="i" :value="i">
-                    Page {{ i + 1 }}
-                  </option>
-                </select>
+                  p{{
+                    sheetOf.get(
+                      `${placement.get(entry.id)?.item}/${
+                        placement.get(entry.id)?.index
+                      }`
+                    )
+                  }}
+                </span>
               </div>
               <div
                 v-if="entry.bullets?.length && placement.has(entry.id)"
@@ -838,80 +843,129 @@ onBeforeRouteLeave(
           <p v-if="!groups.length" class="text-muted small">Nothing matches.</p>
         </div>
 
-        <!-- Layout: order within each page/section -->
+        <!-- Layout: one ordered list of sections, cut into sheets by breaks -->
         <div v-else>
-          <div v-for="(page, p) in variant.pages" :key="p" class="mb-3">
-            <h6 class="cv-admin__group d-flex align-items-center">
-              <span class="flex-grow-1">Page {{ p + 1 }}</span>
+          <p class="small text-muted">
+            Most important first. Sidebar sections always print on sheet 1; page
+            breaks cut the main column into sheets, and a section that continues
+            on the next sheet repeats its heading.
+          </p>
+          <template v-for="(item, i) in variant.sections" :key="i">
+            <div v-if="isBreak(item)" class="cv-admin__break">
+              <span class="flex-grow-1">— page break —</span>
               <button
-                v-if="variant.pages.length > 1"
-                class="a-btn a-btn--icon fw-normal text-lowercase"
-                title="Remove this page"
-                @click="removePage(p)"
+                class="a-btn a-btn--icon"
+                title="Move up"
+                :disabled="i === 0"
+                @click="moveSection(i, -1)"
               >
-                remove page
+                ↑
               </button>
-            </h6>
-            <div
-              v-for="section in SECTION_ORDER.filter((s) => page[s]?.length)"
-              :key="section"
-              class="mb-2"
-            >
-              <div class="cv-admin__label">{{ SECTION_LABELS[section] }}</div>
-              <div
-                v-for="(item, i) in page[section]"
-                :key="refId(item)"
-                class="cv-admin__row"
+              <button
+                class="a-btn a-btn--icon"
+                title="Move down"
+                :disabled="i === variant.sections.length - 1"
+                @click="moveSection(i, 1)"
               >
-                <span class="flex-grow-1">{{ refLabel(item) }}</span>
+                ↓
+              </button>
+              <button
+                class="a-btn a-btn--icon"
+                title="Remove break"
+                @click="removeSectionBreak(i)"
+              >
+                ✕
+              </button>
+            </div>
+            <div v-else class="mb-3">
+              <div class="cv-admin__row cv-admin__section">
+                <span class="cv-admin__label flex-grow-1 mb-0">
+                  {{ SECTION_LABELS[item.section] }}
+                  <span v-if="isSidebar(item.section)" class="cv-admin__tag">
+                    sidebar
+                  </span>
+                  <span v-else-if="sheetCount > 1" class="cv-admin__tag">
+                    p{{ sheetOf.get(`${i}`) }}
+                  </span>
+                </span>
                 <button
                   class="a-btn a-btn--icon"
-                  title="Move up"
+                  title="Move section up"
                   :disabled="i === 0"
-                  @click="move(p, section, i, -1)"
+                  @click="moveSection(i, -1)"
                 >
                   ↑
                 </button>
                 <button
                   class="a-btn a-btn--icon"
-                  title="Move down"
-                  :disabled="i === (page[section]?.length ?? 0) - 1"
-                  @click="move(p, section, i, 1)"
+                  title="Move section down"
+                  :disabled="i === variant.sections.length - 1"
+                  @click="moveSection(i, 1)"
                 >
                   ↓
                 </button>
-                <select
-                  v-if="variant.pages.length > 1"
-                  class="form-select form-select-sm w-auto"
-                  title="Move to page"
-                  :value="p"
-                  @change="moveToPage(refId(item), selectValue($event))"
-                >
-                  <option
-                    v-for="(_, i2) in variant.pages"
-                    :key="i2"
-                    :value="i2"
-                  >
-                    P{{ i2 + 1 }}
-                  </option>
-                </select>
                 <button
                   class="a-btn a-btn--icon"
-                  title="Remove"
-                  @click="removeRef(refId(item))"
+                  title="Insert a page break after this section"
+                  @click="breakAfterSection(i)"
                 >
-                  ✕
+                  ⤓
                 </button>
               </div>
+              <template v-for="(ref, r) in item.refs" :key="r">
+                <div v-if="isBreak(ref)" class="cv-admin__break is-inner">
+                  <span class="flex-grow-1">
+                    — page break ({{ SECTION_LABELS[item.section] }} continues)
+                    —
+                  </span>
+                  <button
+                    class="a-btn a-btn--icon"
+                    title="Remove break"
+                    @click="removeRefBreak(i, r)"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div v-else class="cv-admin__row">
+                  <span class="flex-grow-1">{{ refLabel(ref) }}</span>
+                  <button
+                    class="a-btn a-btn--icon"
+                    title="Move up"
+                    :disabled="r === 0"
+                    @click="moveRef(i, r, -1)"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    class="a-btn a-btn--icon"
+                    title="Move down"
+                    :disabled="r === item.refs.length - 1"
+                    @click="moveRef(i, r, 1)"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    v-if="!isSidebar(item.section)"
+                    class="a-btn a-btn--icon"
+                    title="Insert a page break after this entry"
+                    @click="breakAfterRef(i, r)"
+                  >
+                    ⤓
+                  </button>
+                  <button
+                    class="a-btn a-btn--icon"
+                    title="Remove from this variant"
+                    @click="removeRef(refId(ref))"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </template>
             </div>
-            <p
-              v-if="!SECTION_ORDER.some((s) => page[s]?.length)"
-              class="small text-muted"
-            >
-              Empty page
-            </p>
-          </div>
-          <button class="a-btn" @click="addPage">+ Add page</button>
+          </template>
+          <p v-if="!variant.sections.length" class="small text-muted">
+            Nothing selected yet. Tick entries in the Library tab.
+          </p>
         </div>
       </section>
 
@@ -1159,6 +1213,28 @@ onBeforeRouteLeave(
     background: #1e293b;
     color: #fff;
   }
+}
+
+.cv-admin__break {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px dashed #f59e0b;
+  border-radius: 0.375rem;
+  color: #b45309;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+
+  &.is-inner {
+    margin: 0.25rem 0;
+  }
+}
+
+.cv-admin__section {
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .cv-admin__row {

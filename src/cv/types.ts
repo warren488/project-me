@@ -31,6 +31,10 @@ export interface Interest {
 }
 
 export interface CVPage {
+  // Section order on this page, as chosen in the variant.
+  sections: SectionName[];
+  // Sections that started on an earlier sheet, so their heading is repeated.
+  continued?: SectionName[];
   profile: {
     name: string;
     title: string;
@@ -128,11 +132,36 @@ export type SectionName =
   | "experience"
   | "projects";
 
+// Sections that render in the sidebar of the styled layout (first sheet only).
+export const SIDEBAR_SECTIONS: SectionName[] = [
+  "education",
+  "competencies",
+  "achievements",
+  "interests",
+];
+
 // "entry-id" = include every bullet; object form picks specific bullets.
 export type VariantRef = string | { id: string; bullets?: string[] };
 
-export type VariantPage = Partial<Record<SectionName, VariantRef[]>>;
+// A page break: between sections, or between refs of a main-column section.
+export interface PageBreak {
+  break: true;
+}
 
+export const isBreak = (item: unknown): item is PageBreak =>
+  typeof item === "object" &&
+  item !== null &&
+  (item as PageBreak).break === true;
+
+export interface VariantSection {
+  section: SectionName;
+  refs: (VariantRef | PageBreak)[];
+}
+
+export type VariantItem = VariantSection | PageBreak;
+
+// One ordered list of sections, most important first. Page breaks cut it
+// into printed sheets; on screen it is one continuous document.
 export interface Variant {
   id: string;
   name: string;
@@ -140,7 +169,7 @@ export interface Variant {
   summary?: string;
   layout?: CvLayout; // default "styled"
   contact?: boolean; // include phone and location (for PDFs, not the site)
-  pages: VariantPage[];
+  sections: VariantItem[];
 }
 
 // Which saved variants reference an entry, and each of its bullets. Built by

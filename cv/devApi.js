@@ -4,10 +4,12 @@ const fs = require("fs");
 const path = require("path");
 const {
   resolveVariant,
+  eachRef,
   publish,
   publishTimeline,
   formatRange,
   SECTION_KINDS,
+  SIDEBAR_SECTIONS,
   TIMELINE_DEFAULT_KINDS,
 } = require("./publish");
 
@@ -63,23 +65,19 @@ function usage(library, variants) {
   const byId = new Map(library.entries.map((e) => [e.id, e]));
   const map = {};
   for (const variant of variants) {
-    for (const page of variant.pages) {
-      for (const refs of Object.values(page)) {
-        for (const ref of refs) {
-          const id = typeof ref === "string" ? ref : ref.id;
-          const use = map[id] || (map[id] = { variants: [], bullets: {} });
-          use.variants.push(variant.id);
-          const entry = byId.get(id);
-          const bullets =
-            typeof ref !== "string" && ref.bullets
-              ? ref.bullets
-              : ((entry && entry.bullets) || []).map((b) => b.id);
-          for (const b of bullets) {
-            (use.bullets[b] || (use.bullets[b] = [])).push(variant.id);
-          }
-        }
+    eachRef(variant, (ref) => {
+      const id = typeof ref === "string" ? ref : ref.id;
+      const use = map[id] || (map[id] = { variants: [], bullets: {} });
+      use.variants.push(variant.id);
+      const entry = byId.get(id);
+      const bullets =
+        typeof ref !== "string" && ref.bullets
+          ? ref.bullets
+          : ((entry && entry.bullets) || []).map((b) => b.id);
+      for (const b of bullets) {
+        (use.bullets[b] || (use.bullets[b] = [])).push(variant.id);
       }
-    }
+    });
   }
   return map;
 }
@@ -100,6 +98,7 @@ function state() {
   return {
     library,
     sections: SECTION_KINDS,
+    sidebarSections: SIDEBAR_SECTIONS,
     timelineKinds: TIMELINE_DEFAULT_KINDS,
     variants: variants.map(({ id, name }) => ({ id, name })),
     published,
@@ -195,28 +194,24 @@ function cleanEntry(input) {
 // user can fix it there first.
 function checkEntryStillFits(entry, variants) {
   for (const variant of variants) {
-    for (const page of variant.pages) {
-      for (const [section, refs] of Object.entries(page)) {
-        for (const ref of refs) {
-          const id = typeof ref === "string" ? ref : ref.id;
-          if (id !== entry.id) continue;
-          if (SECTION_KINDS[section] !== entry.kind) {
-            throw new Error(
-              `Variant "${variant.id}" lists "${entry.id}" under ${section}, so it must stay a ${SECTION_KINDS[section]}. Remove it from that variant first.`
-            );
-          }
-          if (typeof ref !== "string" && ref.bullets) {
-            const have = new Set((entry.bullets || []).map((b) => b.id));
-            const missing = ref.bullets.filter((b) => !have.has(b));
-            if (missing.length) {
-              throw new Error(
-                `Variant "${variant.id}" uses bullet "${missing[0]}" of "${entry.id}". Untick it there before removing it.`
-              );
-            }
-          }
+    eachRef(variant, (ref, section) => {
+      const id = typeof ref === "string" ? ref : ref.id;
+      if (id !== entry.id) return;
+      if (SECTION_KINDS[section] !== entry.kind) {
+        throw new Error(
+          `Variant "${variant.id}" lists "${entry.id}" under ${section}, so it must stay a ${SECTION_KINDS[section]}. Remove it from that variant first.`
+        );
+      }
+      if (typeof ref !== "string" && ref.bullets) {
+        const have = new Set((entry.bullets || []).map((b) => b.id));
+        const missing = ref.bullets.filter((b) => !have.has(b));
+        if (missing.length) {
+          throw new Error(
+            `Variant "${variant.id}" uses bullet "${missing[0]}" of "${entry.id}". Untick it there before removing it.`
+          );
         }
       }
-    }
+    });
   }
 }
 
@@ -259,13 +254,13 @@ function deleteEntry(id) {
   const index = library.entries.findIndex((e) => e.id === id);
   if (index === -1) throw new Error(`No entry "${id}"`);
   const users = readVariants()
-    .filter((v) =>
-      v.pages.some((page) =>
-        Object.values(page).some((refs) =>
-          refs.some((ref) => (typeof ref === "string" ? ref : ref.id) === id)
-        )
-      )
-    )
+    .filter((v) => {
+      let used = false;
+      eachRef(v, (ref) => {
+        if ((typeof ref === "string" ? ref : ref.id) === id) used = true;
+      });
+      return used;
+    })
     .map((v) => v.id);
   if (users.length) {
     throw new Error(

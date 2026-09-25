@@ -1,38 +1,21 @@
 <script setup lang="ts">
 import { computed, PropType } from "vue";
 import { CVPage } from "@/cv/types";
+import { mergePages } from "@/cv/merge";
 import { usePrintPage } from "@/cv/usePrintPage";
-
-usePrintPage("size: A4; margin: 18mm 20mm;");
 
 // A plain, single-column CV for applicant tracking systems: conventional
 // headings, no columns, tables, icons or pills, and contact details in the
-// body rather than a header. Pages in the variant only affect ordering.
+// body rather than a header. It follows the variant's section order and
+// ignores page breaks, since a single column flows across pages by itself.
 const props = defineProps({
   pages: { type: Array as PropType<CVPage[]>, required: true },
 });
 
-const profile = computed(() => props.pages[0]?.profile);
+usePrintPage("size: A4; margin: 18mm 20mm;");
 
-const merged = computed(() => {
-  const all = <K extends keyof CVPage>(key: K) =>
-    props.pages.flatMap((p) => (p[key] as unknown[] | undefined) ?? []);
-  const skills: Record<string, string[]> = {};
-  for (const page of props.pages) {
-    for (const [category, list] of Object.entries(page.skills ?? {})) {
-      skills[category] = [...(skills[category] ?? []), ...list];
-    }
-  }
-  return {
-    experience: all("experience") as CVPage["experience"],
-    education: all("education") as CVPage["education"],
-    projects: all("projects") as CVPage["projects"],
-    achievements: all("achievements") as CVPage["achievements"],
-    competencies: all("competencies") as string[],
-    interests: all("interests") as CVPage["interests"],
-    skills,
-  };
-});
+const page = computed(() => mergePages(props.pages));
+const profile = computed(() => page.value?.profile);
 
 const contactLine = computed(() =>
   [
@@ -47,7 +30,7 @@ const contactLine = computed(() =>
 </script>
 
 <template>
-  <div v-if="profile" class="ats">
+  <div v-if="page && profile" class="ats">
     <header class="ats__header">
       <h1>{{ profile.name }}</h1>
       <p class="ats__headline">{{ profile.title }}</p>
@@ -59,66 +42,72 @@ const contactLine = computed(() =>
       <p v-html="profile.summary"></p>
     </section>
 
-    <section v-if="merged.experience?.length">
-      <h2>Experience</h2>
-      <article v-for="(job, i) in merged.experience" :key="i" class="ats__item">
-        <h3>{{ job.title }}</h3>
-        <p class="ats__meta">{{ job.company }} | {{ job.dates }}</p>
-        <ul>
-          <li v-for="(detail, d) in job.details" :key="d" v-html="detail"></li>
-        </ul>
-      </article>
-    </section>
+    <template v-for="s in page.sections" :key="s">
+      <section v-if="s === 'experience' && page.experience?.length">
+        <h2>Experience</h2>
+        <article v-for="(job, i) in page.experience" :key="i" class="ats__item">
+          <h3>{{ job.title }}</h3>
+          <p class="ats__meta">{{ job.company }} | {{ job.dates }}</p>
+          <ul>
+            <li
+              v-for="(detail, d) in job.details"
+              :key="d"
+              v-html="detail"
+            ></li>
+          </ul>
+        </article>
+      </section>
 
-    <section v-if="merged.education?.length">
-      <h2>Education</h2>
-      <article v-for="(edu, i) in merged.education" :key="i" class="ats__item">
-        <h3>{{ edu.degree }}</h3>
-        <p class="ats__meta">{{ edu.uni }} | {{ edu.dates }}</p>
-        <p v-if="edu.details">{{ edu.details }}</p>
-      </article>
-    </section>
+      <section v-else-if="s === 'education' && page.education?.length">
+        <h2>Education</h2>
+        <article v-for="(edu, i) in page.education" :key="i" class="ats__item">
+          <h3>{{ edu.degree }}</h3>
+          <p class="ats__meta">{{ edu.uni }} | {{ edu.dates }}</p>
+          <p v-if="edu.details">{{ edu.details }}</p>
+        </article>
+      </section>
 
-    <section v-if="Object.keys(merged.skills).length">
-      <h2>Skills</h2>
-      <p v-for="(list, category) in merged.skills" :key="category">
-        <strong>{{ category }}:</strong> {{ list.join(", ") }}
-      </p>
-    </section>
+      <section v-else-if="s === 'skills' && page.skills">
+        <h2>Skills</h2>
+        <p v-for="(list, category) in page.skills" :key="category">
+          <strong>{{ category }}:</strong> {{ list.join(", ") }}
+        </p>
+      </section>
 
-    <section v-if="merged.competencies.length">
-      <h2>Core Competencies</h2>
-      <p>{{ merged.competencies.join(", ") }}</p>
-    </section>
+      <section v-else-if="s === 'competencies' && page.competencies?.length">
+        <h2>Core Competencies</h2>
+        <p>{{ page.competencies.join(", ") }}</p>
+      </section>
 
-    <section v-if="merged.projects?.length">
-      <h2>Projects</h2>
-      <article v-for="(proj, i) in merged.projects" :key="i" class="ats__item">
-        <h3>{{ proj.title }}</h3>
-        <p v-if="proj.tech" class="ats__meta">{{ proj.tech }}</p>
-        <p>{{ proj.desc }}</p>
-      </article>
-    </section>
+      <section v-else-if="s === 'projects' && page.projects?.length">
+        <h2>Projects</h2>
+        <article v-for="(proj, i) in page.projects" :key="i" class="ats__item">
+          <h3>{{ proj.title }}</h3>
+          <p v-if="proj.tech" class="ats__meta">{{ proj.tech }}</p>
+          <p>{{ proj.desc }}</p>
+        </article>
+      </section>
 
-    <section v-if="merged.achievements?.length">
-      <h2>Achievements</h2>
-      <article v-for="(a, i) in merged.achievements" :key="i" class="ats__item">
-        <h3>{{ a.role }}</h3>
-        <p class="ats__meta">{{ a.org }}</p>
-        <p v-if="a.note">{{ a.note }}</p>
-      </article>
-    </section>
+      <section v-else-if="s === 'achievements' && page.achievements?.length">
+        <h2>Achievements</h2>
+        <article v-for="(a, i) in page.achievements" :key="i" class="ats__item">
+          <h3>{{ a.role }}</h3>
+          <p class="ats__meta">{{ a.org }}</p>
+          <p v-if="a.note">{{ a.note }}</p>
+        </article>
+      </section>
 
-    <section v-if="merged.interests?.length">
-      <h2>Interests</h2>
-      <p>
-        <template v-for="(int, i) in merged.interests" :key="i">
-          <strong>{{ int.name }}</strong
-          ><span v-if="int.desc"> ({{ int.desc }})</span
-          ><span v-if="i < merged.interests!.length - 1">, </span>
-        </template>
-      </p>
-    </section>
+      <section v-else-if="s === 'interests' && page.interests?.length">
+        <h2>Interests</h2>
+        <p>
+          <template v-for="(int, i) in page.interests" :key="i">
+            <strong>{{ int.name }}</strong
+            ><span v-if="int.desc"> ({{ int.desc }})</span
+            ><span v-if="i < page.interests.length - 1">, </span>
+          </template>
+        </p>
+      </section>
+    </template>
   </div>
 </template>
 

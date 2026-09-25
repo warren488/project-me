@@ -3,19 +3,30 @@
   "name": "Full CV",
   "title": "Full Stack Software Engineer",
   "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives.",
-  "pages": [
+  "sections": [
+    { "section": "education", "refs": ["edu-msc-nottingham", "edu-bsc-uwi"] },
     {
-      "education": ["edu-msc-nottingham", "edu-bsc-uwi"],
-      "competencies": [
+      "section": "competencies",
+      "refs": [
         "comp-agile",
         "comp-cicd",
         "comp-tdd",
         "comp-jira",
         "comp-microservices",
         "comp-mentorship"
-      ],
-      "achievements": ["ach-startup-weekend", "ach-research-paper"],
-      "skills": [
+      ]
+    },
+    {
+      "section": "achievements",
+      "refs": ["ach-startup-weekend", "ach-research-paper"]
+    },
+    {
+      "section": "interests",
+      "refs": ["int-hardware", "int-cricket", "int-pwa-research"]
+    },
+    {
+      "section": "skills",
+      "refs": [
         "skill-typescript",
         "skill-javascript",
         "skill-react",
@@ -33,13 +44,18 @@
         "skill-gitops",
         "skill-kafka",
         "skill-sql"
-      ],
-      "experience": ["job-rad", "job-smartterm", "job-smartmatic"]
+      ]
     },
     {
-      "experience": ["job-hyuna"],
-      "interests": ["int-hardware", "int-cricket", "int-pwa-research"],
-      "projects": ["proj-chat-pwa", "proj-dominoes"]
-    }
+      "section": "experience",
+      "refs": [
+        "job-rad",
+        "job-smartterm",
+        "job-smartmatic",
+        { "break": true },
+        "job-hyuna"
+      ]
+    },
+    { "section": "projects", "refs": ["proj-chat-pwa", "proj-dominoes"] }
   ]
 }
