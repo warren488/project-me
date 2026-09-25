@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { onBeforeRouteLeave } from "vue-router";
+import CvAtsDocument from "@/components/CvAtsDocument.vue";
 import CvDocument from "@/components/CvDocument.vue";
 import EntryEditor from "@/components/EntryEditor.vue";
 import {
@@ -87,6 +95,7 @@ const search = ref("");
 const onlySelected = ref(false);
 const targetPage = ref(0);
 const zoom = ref(0.6);
+const paged = ref(true); // preview as A4 sheets so overflow is visible
 
 const entries = computed(() => state.value?.library.entries ?? []);
 const byId = computed(() => new Map(entries.value.map((e) => [e.id, e])));
@@ -508,6 +517,30 @@ function schedulePreview() {
 
 watch(variant, schedulePreview, { deep: true });
 
+// In paged mode each sheet clips, so measure how much would be cut off.
+const previewEl = ref<HTMLElement | null>(null);
+const overflow = ref<{ page: number; mm: number }[]>([]);
+
+async function measureOverflow() {
+  await nextTick();
+  const sheets = previewEl.value?.querySelectorAll<HTMLElement>(".cv-page");
+  if (!paged.value || !sheets?.length) {
+    overflow.value = [];
+    return;
+  }
+  const A4_MM = 297;
+  overflow.value = [...sheets]
+    .map((el, i) => ({
+      page: i + 1,
+      mm: Math.round(
+        ((el.scrollHeight - el.clientHeight) / el.clientHeight) * A4_MM
+      ),
+    }))
+    .filter((o) => o.mm > 0);
+}
+
+watch([preview, paged, zoom], measureOverflow);
+
 const printCv = () => window.print();
 
 const warnOnUnload = (event: BeforeUnloadEvent) => {
@@ -597,6 +630,32 @@ onBeforeRouteLeave(
                 rows="3"
                 class="form-control form-control-sm"
               ></textarea>
+            </label>
+            <label class="col-6">
+              <span class="cv-admin__label">Layout</span>
+              <select
+                class="form-select form-select-sm"
+                :value="variant.layout ?? 'styled'"
+                @change="
+                  variant.layout = ($event.target as HTMLSelectElement)
+                    .value as Variant['layout']
+                "
+              >
+                <option value="styled">Styled (two columns)</option>
+                <option value="ats">ATS (plain single column)</option>
+              </select>
+            </label>
+            <label
+              class="col-6 form-check d-flex align-items-end gap-1 ps-4 mb-0"
+              title="Adds phone and location to this variant. Fine for a PDF, but they'd be public if this variant is published to the site."
+            >
+              <input
+                type="checkbox"
+                class="form-check-input"
+                :checked="!!variant.contact"
+                @change="variant.contact = checked($event) || undefined"
+              />
+              <span class="small">Include phone &amp; location</span>
             </label>
           </div>
           <div class="d-flex gap-2 mt-2 align-items-center flex-wrap">
@@ -870,12 +929,37 @@ onBeforeRouteLeave(
             <option :value="1">100%</option>
           </select>
           <button class="a-btn" @click="printCv">Print / save PDF</button>
+          <label
+            v-if="(variant.layout ?? 'styled') === 'styled'"
+            class="form-check small mb-0 ms-1"
+          >
+            <input v-model="paged" type="checkbox" class="form-check-input" />
+            A4 pages
+          </label>
           <span v-if="previewError" class="small text-danger">{{
             previewError
           }}</span>
         </div>
-        <div class="cv-admin__zoom" :style="{ zoom }">
-          <CvDocument v-if="preview.length" :pages="preview" />
+        <div
+          v-if="variant.contact && variant.id === state.published"
+          class="alert alert-warning py-1 px-2 small no-print"
+        >
+          This variant is published with phone and location, so they are visible
+          on the public site.
+        </div>
+        <div
+          v-for="o in overflow"
+          :key="o.page"
+          class="alert alert-danger py-1 px-2 small no-print"
+        >
+          Page {{ o.page }} overflows by about {{ o.mm }}mm. Move something to
+          another page or untick some bullets, or it will be cut off in print.
+        </div>
+        <div ref="previewEl" class="cv-admin__zoom" :style="{ zoom }">
+          <template v-if="preview.length">
+            <CvAtsDocument v-if="variant.layout === 'ats'" :pages="preview" />
+            <CvDocument v-else :pages="preview" :paged="paged" />
+          </template>
         </div>
       </section>
     </div>

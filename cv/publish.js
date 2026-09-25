@@ -8,6 +8,8 @@ const path = require("path");
 const CV_DIR = __dirname;
 
 // Which entry kind each page section accepts.
+const LAYOUTS = ["styled", "ats"];
+
 const SECTION_KINDS = {
   education: "education",
   competencies: "competency",
@@ -81,7 +83,10 @@ function resolveVariant(library, variant) {
     });
   };
 
-  const { name, email, website } = library.profile;
+  if (variant.layout !== undefined && !LAYOUTS.includes(variant.layout)) {
+    throw new Error(`${where}: unknown layout "${variant.layout}"`);
+  }
+  const { name, email, website, phone, location } = library.profile;
 
   return variant.pages.map((page, index) => {
     for (const section of Object.keys(page)) {
@@ -93,6 +98,10 @@ function resolveVariant(library, variant) {
     const out = {
       profile: { name, title: variant.title, email, website },
     };
+    if (variant.contact) {
+      if (phone) out.profile.phone = phone;
+      if (location) out.profile.location = location;
+    }
     if (index === 0 && variant.summary) out.profile.summary = variant.summary;
 
     if (page.education) {
@@ -207,6 +216,7 @@ function publish(variantId = "full") {
   const variant = readJson(path.join(CV_DIR, "variants", `${variantId}.json`));
   const published = {
     variant: variant.id,
+    layout: variant.layout || "styled",
     pages: resolveVariant(library, variant),
   };
   fs.writeFileSync(
@@ -226,6 +236,7 @@ module.exports = {
   formatRange,
   SECTION_KINDS,
   TIMELINE_DEFAULT_KINDS,
+  LAYOUTS,
 };
 
 if (require.main === module) {

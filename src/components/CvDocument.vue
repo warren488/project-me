@@ -4,19 +4,24 @@ import { CVPage } from "@/cv/types";
 
 defineProps({
   pages: { type: Array as PropType<CVPage[]>, required: true },
+  // Render each page as an A4 sheet on screen, exactly as it prints.
+  paged: { type: Boolean, default: false },
 });
 </script>
 
 <template>
-  <div class="cv-wrapper">
-    <div class="cv-container" :style="{ '--pages': pages.length }">
-      <aside class="sidebar">
-        <div
-          v-for="(page, index) of pages"
-          :key="index"
-          class="cv-page"
-          :class="{ 'cv-page--first': index === 0 }"
-        >
+  <div class="cv-wrapper" :class="{ 'is-paged': paged }">
+    <div class="cv-container">
+      <section
+        v-for="(page, index) in pages"
+        :key="index"
+        class="cv-page"
+        :class="{
+          'cv-page--first': index === 0,
+          'cv-page--last': index === pages.length - 1,
+        }"
+      >
+        <aside class="sidebar">
           <div class="sidebar-personal-info">
             <div class="profile-header">
               <h1>{{ page.profile.name }}</h1>
@@ -24,7 +29,12 @@ defineProps({
             </div>
 
             <div class="contact-box">
-              <!-- <div class="contact-item">{{ page.profile.location }}</div> -->
+              <div v-if="page.profile.location" class="contact-item">
+                {{ page.profile.location }}
+              </div>
+              <div v-if="page.profile.phone" class="contact-item">
+                {{ page.profile.phone }}
+              </div>
               <div class="contact-item">
                 <a :href="`mailto:${page.profile.email}`">{{
                   page.profile.email
@@ -41,8 +51,8 @@ defineProps({
           <div class="sidebar-section" v-if="page.education">
             <div class="sidebar-title">Education</div>
             <div
-              v-for="(edu, index) in page.education"
-              :key="index"
+              v-for="(edu, i) in page.education"
+              :key="i"
               class="sidebar-item"
             >
               <span class="sidebar-item-title">{{ edu.degree }}</span>
@@ -58,8 +68,8 @@ defineProps({
             <div class="sidebar-title">Notable Competencies</div>
             <div class="pill-container">
               <span
-                v-for="(comp, index) in page.competencies"
-                :key="index"
+                v-for="(comp, i) in page.competencies"
+                :key="i"
                 class="sidebar-pill"
               >
                 {{ comp }}
@@ -70,8 +80,8 @@ defineProps({
           <div class="sidebar-section" v-if="page.achievements">
             <div class="sidebar-title">Achievements</div>
             <div
-              v-for="(lead, index) in page.achievements"
-              :key="index"
+              v-for="(lead, i) in page.achievements"
+              :key="i"
               class="sidebar-item"
             >
               <span class="sidebar-item-title">{{ lead.role }}</span>
@@ -84,24 +94,17 @@ defineProps({
           <div class="sidebar-section" v-if="page.interests">
             <div class="sidebar-title">Interests & Passions</div>
             <div
-              v-for="(int, index) in page.interests"
-              :key="index"
+              v-for="(int, i) in page.interests"
+              :key="i"
               class="sidebar-item"
             >
               <span class="sidebar-item-title">{{ int.name }}</span>
               <span class="sidebar-item-date">{{ int.desc }}</span>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      <main class="main-content">
-        <div
-          v-for="(page, index) in pages"
-          :key="index"
-          class="cv-page"
-          :class="{ 'cv-page--first': index === 0 }"
-        >
+        <main class="main-content">
           <p
             class="summary"
             v-if="page.profile.summary"
@@ -130,8 +133,8 @@ defineProps({
             <h3 class="section-title">Professional Experience</h3>
 
             <div
-              v-for="(job, index) in page.experience"
-              :key="index"
+              v-for="(job, i) in page.experience"
+              :key="i"
               class="experience-item"
             >
               <div class="job-header">
@@ -144,8 +147,8 @@ defineProps({
               <div class="job-details">
                 <ul>
                   <li
-                    v-for="(detail, i) in job.details"
-                    :key="i"
+                    v-for="(detail, d) in job.details"
+                    :key="d"
                     v-html="detail"
                   ></li>
                 </ul>
@@ -156,8 +159,8 @@ defineProps({
             <h3 class="section-title">Key Projects</h3>
             <div class="project-grid">
               <div
-                v-for="(proj, index) in page.projects"
-                :key="index"
+                v-for="(proj, i) in page.projects"
+                :key="i"
                 class="project-card"
               >
                 <span class="project-title">{{ proj.title }}</span>
@@ -166,8 +169,8 @@ defineProps({
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </section>
     </div>
   </div>
 </template>
@@ -213,14 +216,56 @@ defineProps({
 
 /* --- GRID LAYOUT --- */
 .cv-container {
-  background: white;
   width: 100%;
   max-width: var(--container-max-width);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Each page is its own sidebar + main grid, so a page can never spill into
+   the next one. On screen the pages stack into one continuous document. */
+.cv-page {
+  background: white;
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  border-radius: var(--border-radius);
   overflow: hidden;
+}
+
+.cv-page--first {
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.cv-page--last {
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Continuous on screen: no padding where two pages meet. */
+.cv-wrapper:not(.is-paged) .cv-page:not(.cv-page--first) .sidebar,
+.cv-wrapper:not(.is-paged) .cv-page:not(.cv-page--first) .main-content {
+  padding-top: 0;
+}
+
+.cv-wrapper:not(.is-paged) .cv-page:not(.cv-page--last) .sidebar,
+.cv-wrapper:not(.is-paged) .cv-page:not(.cv-page--last) .main-content {
+  padding-bottom: 0;
+}
+
+/* --- PAGED (print, and the dashboard preview) --- */
+.cv-wrapper.is-paged {
+  padding: 0;
+}
+
+.cv-wrapper.is-paged .cv-container {
+  max-width: none;
+  width: auto;
+}
+
+.cv-wrapper.is-paged .cv-page {
+  width: 210mm;
+  height: 297mm;
+  border-radius: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  margin: 0 auto 8mm;
+  grid-template-columns: 280px 1fr;
 }
 
 /* --- SIDEBAR --- */
@@ -486,7 +531,7 @@ defineProps({
 
 /* Responsive */
 @media (max-width: 768px) {
-  .cv-container {
+  .cv-wrapper:not(.is-paged) .cv-page {
     grid-template-columns: 1fr;
   }
 
@@ -502,27 +547,43 @@ defineProps({
 
 /* Print Overrides */
 @media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
   .cv-container {
-    width: 100%;
     max-width: none;
+    width: auto;
+  }
+
+  /* One sheet per page, clipped, with a hard break after each. */
+  .cv-page,
+  .cv-wrapper.is-paged .cv-page {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    border-radius: 0;
     box-shadow: none;
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    /* One printed sheet per CV page; --pages is set from the pages prop. */
-    min-height: calc(var(--pages, 1) * 100vh);
     overflow: hidden;
+    grid-template-columns: 280px 1fr;
+    break-after: page;
+    page-break-after: always;
+  }
+  .cv-page--last {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  .cv-page .sidebar,
+  .cv-page .main-content {
+    padding-top: var(--column-y-padding);
+    padding-bottom: var(--column-y-padding);
   }
 
   .sidebar {
     background-color: #2c3e50 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-  .cv-page {
-    height: calc(100vh - var(--column-y-padding, 0px));
-  }
-  .cv-page:not(.cv-page--first) {
-    padding-top: var(--column-y-padding);
   }
 
   .skill-pill {

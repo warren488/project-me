@@ -1,5 +1,6 @@
 {
   "variant": "full",
+  "layout": "styled",
   "pages": [
     {
       "profile": {
@@ -13,7 +14,7 @@
         {
           "degree": "MSc Computer Science",
           "uni": "University of Nottingham",
-          "dates": "2021 – 2022",
+          "dates": "Sep 2021 – Sep 2022",
           "details": "Distinction."
         },
         {
@@ -52,7 +53,12 @@
           "Vue.js",
           "Tailwind CSS"
         ],
-        "Backend": ["Node.js", "Express", "RESTful APIs", "GraphQL"],
+        "Backend": [
+          "Node.js",
+          "Express",
+          "RESTful APIs",
+          "GraphQL"
+        ],
         "DevOps & Cloud": [
           "GCP",
           "AWS Lambda",

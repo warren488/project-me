@@ -36,6 +36,8 @@ export interface CVPage {
     title: string;
     email: string;
     website: string;
+    phone?: string; // only when the variant asks for contact details
+    location?: string;
     summary?: string;
   };
   education?: Education[];
@@ -47,8 +49,13 @@ export interface CVPage {
   projects?: Project[];
 }
 
+// "styled" is the two-column design; "ats" is a plain single column that
+// applicant tracking systems can parse.
+export type CvLayout = "styled" | "ats";
+
 export interface PublishedCV {
   variant: string;
+  layout: CvLayout;
   pages: CVPage[];
 }
 
@@ -131,6 +138,8 @@ export interface Variant {
   name: string;
   title: string;
   summary?: string;
+  layout?: CvLayout; // default "styled"
+  contact?: boolean; // include phone and location (for PDFs, not the site)
   pages: VariantPage[];
 }
 
