@@ -4,7 +4,10 @@
   "title": "Full Stack Software Engineer",
   "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives.",
   "sections": [
-    { "section": "education", "refs": ["edu-msc-nottingham", "edu-bsc-uwi"] },
+    {
+      "section": "education",
+      "refs": ["edu-msc-nottingham", "edu-bsc-uwi"]
+    },
     {
       "section": "competencies",
       "refs": [
@@ -45,10 +48,13 @@
     {
       "section": "experience",
       "refs": [
+        "job-wsc",
         "job-rad",
         "job-smartterm",
+        {
+          "break": true
+        },
         "job-smartmatic",
-        { "break": true },
         "job-hyuna"
       ]
     },

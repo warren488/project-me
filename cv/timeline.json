@@ -2,6 +2,96 @@
   "name": "Warren Scantlebury",
   "items": [
     {
+      "id": "eng-cakebox",
+      "kind": "engagement",
+      "title": "Cakebox",
+      "start": "2026-04",
+      "end": "2026-09",
+      "dates": "Apr 2026 – Sep 2026",
+      "tags": [
+        "client"
+      ],
+      "parent": "job-rad",
+      "bullets": []
+    },
+    {
+      "id": "eng-jcdecaux",
+      "kind": "engagement",
+      "title": "JCDecaux",
+      "start": "2026-01",
+      "end": "2026-03",
+      "dates": "Jan 2026 – Mar 2026",
+      "tags": [
+        "client"
+      ],
+      "parent": "job-rad",
+      "bullets": []
+    },
+    {
+      "id": "eng-direct-wines",
+      "kind": "engagement",
+      "title": "Direct Wines",
+      "start": "2025-10",
+      "end": "2025-12",
+      "dates": "Oct 2025 – Dec 2025",
+      "tags": [
+        "client"
+      ],
+      "parent": "job-rad",
+      "bullets": []
+    },
+    {
+      "id": "eng-bright-sparks",
+      "kind": "engagement",
+      "title": "Bright Sparks Tutoring Agency",
+      "start": "2025-02",
+      "end": null,
+      "dates": "Feb 2025 – Present",
+      "tags": [
+        "client",
+        "fullstack",
+        "devops"
+      ],
+      "parent": "job-wsc",
+      "bullets": [
+        "Designed and delivered the public website and enrolment platform for <strong>Bright Sparks Tutoring Agency</strong> end to end, from requirements and copy through launch and handover.",
+        "Built it on <strong>Next.js, React and Firebase</strong> (Firestore, Auth, Cloud Functions): a multi-step enrolment form with validation, a role-based admin dashboard, and email notifications for new enrolments.",
+        "Owned delivery and operations: <strong>GitHub Actions</strong> deploys to Firebase App Hosting, Cypress end-to-end tests, honeypot and reCAPTCHA v3 bot protection, and a documented daily backup plan for submissions."
+      ]
+    },
+    {
+      "id": "job-wsc",
+      "kind": "job",
+      "title": "Independent Software Consultant",
+      "start": "2025-02",
+      "end": null,
+      "dates": "Feb 2025 – Present",
+      "tags": [
+        "fullstack",
+        "devops",
+        "consulting"
+      ],
+      "org": "Warren Scantlebury Consulting",
+      "bullets": [
+        "Sole trader consultancy taking on end-to-end product work for small businesses: scoping, build, deployment and handover, with the client owning the result."
+      ]
+    },
+    {
+      "id": "eng-ovo",
+      "kind": "engagement",
+      "title": "OVO Energy",
+      "start": "2022-10",
+      "end": "2025-11",
+      "dates": "Oct 2022 – Nov 2025",
+      "tags": [
+        "client",
+        "fullstack",
+        "devops"
+      ],
+      "parent": "job-rad",
+      "bullets": []
+    },
+    {
       "id": "job-rad",
       "kind": "job",
       "title": "Software Engineering Consultant",

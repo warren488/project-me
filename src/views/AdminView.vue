@@ -27,14 +27,15 @@ import {
   Variant,
   VariantRef,
   VariantSection,
+  CvLayout,
 } from "@/cv/types";
 
 interface State {
   library: { profile: Profile; entries: LibraryEntry[] };
   sections: Record<SectionName, EntryKind>;
   timelineKinds: string[];
-  variants: { id: string; name: string }[];
-  published: string | null;
+  variants: { id: string; name: string; layout: CvLayout }[];
+  published: Record<CvLayout, string | null>;
   usage: Record<string, EntryUsage>;
 }
 
@@ -51,6 +52,7 @@ type GroupBy = "kind" | "org" | "year" | "tag";
 
 const KIND_LABELS: Record<EntryKind, string> = {
   job: "Jobs",
+  engagement: "Client engagements",
   education: "Education",
   project: "Projects",
   achievement: "Achievements",
@@ -172,6 +174,8 @@ function addRef(ref: VariantRef) {
   const entry = byId.value.get(refId(ref));
   if (!entry || !variant.value) return;
   const section = sectionForKind.value[entry.kind];
+  // Engagements have no section of their own: they render under their job.
+  if (!section) return;
   let item = variant.value.sections.find(
     (s): s is VariantSection => !isBreak(s) && s.section === section
   );
@@ -349,6 +353,8 @@ const saveProfile = () =>
 // --- Library entries (add / edit / delete) ---
 const editor = ref<{ entry: LibraryEntry | null } | null>(null);
 const existingIds = computed(() => entries.value.map((e) => e.id));
+// Parents an engagement can sit under.
+const jobs = computed(() => entries.value.filter((e) => e.kind === "job"));
 const knownTags = computed(() =>
   [
     ...new Set(
@@ -561,7 +567,7 @@ const saveAndPublish = () =>
     await saveVariant();
     await api(`publish/${variant.value.id}`, "POST");
     await loadState();
-    flash(`Published "${variant.value.name}" to /my-experience`);
+    flash(`Published "${variant.value.name}" to /cv`);
   });
 
 const revert = () =>
@@ -659,7 +665,10 @@ onMounted(() => {
   window.addEventListener("beforeunload", warnOnUnload);
   run(async () => {
     await loadState();
-    const first = state.value?.published ?? state.value?.variants[0]?.id;
+    const first =
+      state.value?.published.styled ??
+      state.value?.published.ats ??
+      state.value?.variants[0]?.id;
     if (first) await loadVariant(first);
   });
 });
@@ -692,7 +701,9 @@ onBeforeRouteLeave(
               >
                 <option v-for="v in state.variants" :key="v.id" :value="v.id">
                   {{ v.name
-                  }}{{ v.id === state.published ? " (published)" : "" }}
+                  }}{{
+                    v.id === state.published[v.layout] ? " (published)" : ""
+                  }}
                 </option>
               </select>
             </label>
@@ -862,6 +873,12 @@ onBeforeRouteLeave(
                   type="checkbox"
                   class="form-check-input mt-1 flex-shrink-0"
                   :checked="placement.has(entry.id)"
+                  :disabled="entry.kind === 'engagement'"
+                  :title="
+                    entry.kind === 'engagement'
+                      ? 'Engagements follow their job into a variant'
+                      : undefined
+                  "
                   @change="onToggleEntry(entry, $event)"
                 />
                 <label :for="`entry-${g}-${entry.id}`" class="flex-grow-1">
@@ -1111,7 +1128,10 @@ onBeforeRouteLeave(
           }}</span>
         </div>
         <div
-          v-if="variant.contact && variant.id === state.published"
+          v-if="
+            variant.contact &&
+            variant.id === state.published[variant.layout ?? 'styled']
+          "
           class="alert alert-warning py-1 px-2 small no-print"
         >
           This variant is published with phone and location, so they are visible
@@ -1212,6 +1232,7 @@ onBeforeRouteLeave(
           :known-categories="knownCategories"
           :usage="editor.entry ? state.usage[editor.entry.id] : undefined"
           :timeline-kinds="state.timelineKinds"
+          :jobs="jobs"
           :busy="busy"
           @save="saveEntry"
           @delete="deleteEntry"

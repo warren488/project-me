@@ -6,7 +6,9 @@
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint",
-    "cv:publish": "node cv/publish.js"
+    "cv:publish": "node cv/publish.js",
+    "deploy": "npm run build && firebase deploy --only hosting",
+    "og:build": "node scripts/build-social-card.js"
   },
   "dependencies": {
     "core-js": "^3.8.3",

@@ -149,6 +149,25 @@ const cont = (s: SectionName) =>
                 ></li>
               </ul>
             </div>
+            <div
+              v-for="(eng, e) in job.engagements"
+              :key="e"
+              class="engagement"
+            >
+              <div class="engagement-header">
+                <span class="engagement-client">{{ eng.client }}</span>
+                <span v-if="eng.dates" class="dates">{{ eng.dates }}</span>
+              </div>
+              <div v-if="eng.details.length" class="job-details">
+                <ul>
+                  <li
+                    v-for="(detail, d) in eng.details"
+                    :key="d"
+                    v-html="detail"
+                  ></li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -432,6 +451,27 @@ const cont = (s: SectionName) =>
   position: absolute;
   left: 0;
   color: var(--color-accent);
+}
+
+/* Client engagements under a consultancy role */
+.engagement {
+  margin: 6px 0 0 4px;
+  padding-left: 12px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.engagement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.engagement-client {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary);
 }
 
 /* Projects */

@@ -6,11 +6,14 @@ const {
   resolveVariant,
   eachRef,
   publish,
+  readPublished,
   publishTimeline,
   formatRange,
   SECTION_KINDS,
   SIDEBAR_SECTIONS,
   TIMELINE_DEFAULT_KINDS,
+  KINDS,
+  ENGAGEMENT_KIND,
 } = require("./publish");
 
 const CV_DIR = __dirname;
@@ -18,7 +21,6 @@ const LIBRARY_FILE = path.join(CV_DIR, "library.json");
 const VARIANTS_DIR = path.join(CV_DIR, "variants");
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
-const KINDS = Object.values(SECTION_KINDS);
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 // Written through prettier so the files match what lint-staged would produce.
@@ -89,18 +91,22 @@ function state() {
   for (const entry of library.entries) {
     entry.displayDates = formatRange(entry);
   }
-  let published = null;
-  try {
-    published = readJson(path.join(CV_DIR, "published.json")).variant;
-  } catch (err) {
-    // nothing published yet
-  }
+  // Which variant fills each layout slot on the site.
+  const site = readPublished();
+  const published = {
+    styled: site.styled ? site.styled.variant : null,
+    ats: site.ats ? site.ats.variant : null,
+  };
   return {
     library,
     sections: SECTION_KINDS,
     sidebarSections: SIDEBAR_SECTIONS,
     timelineKinds: TIMELINE_DEFAULT_KINDS,
-    variants: variants.map(({ id, name }) => ({ id, name })),
+    variants: variants.map(({ id, name, layout }) => ({
+      id,
+      name,
+      layout: layout || "styled",
+    })),
     published,
     usage: used,
   };
@@ -142,6 +148,11 @@ function cleanEntry(input) {
   if (input.kind === "skill") {
     if (!category) throw new Error("Skills need a category");
     entry.category = category;
+  }
+  if (input.kind === ENGAGEMENT_KIND) {
+    const parent = optionalString(input, "parent");
+    if (!parent) throw new Error("An engagement needs a parent job");
+    entry.parent = checkId(parent, "parent");
   }
   const start = optionalString(input, "start");
   if (start) {
@@ -239,6 +250,15 @@ function saveEntry(id, input) {
   if (entry.id !== id) throw new Error("Entry id does not match URL");
   const library = readJson(LIBRARY_FILE);
   checkEntryStillFits(entry, readVariants());
+  if (entry.kind === ENGAGEMENT_KIND) {
+    const parent = library.entries.find((e) => e.id === entry.parent);
+    if (!parent || parent.kind !== "job")
+      throw new Error(
+        `"${entry.parent}" is not a job, so it can't be the parent`
+      );
+    if (parent.id === entry.id)
+      throw new Error("An engagement can't be its own parent");
+  }
   const index = library.entries.findIndex((e) => e.id === id);
   if (index === -1) library.entries.push(entry);
   else library.entries[index] = entry;
@@ -253,6 +273,15 @@ function deleteEntry(id) {
   const library = readJson(LIBRARY_FILE);
   const index = library.entries.findIndex((e) => e.id === id);
   if (index === -1) throw new Error(`No entry "${id}"`);
+  const clients = library.entries.filter(
+    (e) => e.kind === ENGAGEMENT_KIND && e.parent === id
+  );
+  if (clients.length)
+    throw new Error(
+      `"${id}" still has engagements under it (${clients
+        .map((e) => e.id)
+        .join(", ")}). Move or delete those first.`
+    );
   const users = readVariants()
     .filter((v) => {
       let used = false;
@@ -274,53 +303,57 @@ function deleteEntry(id) {
   publishTimeline();
 }
 
-module.exports = function mountCvApi(app) {
-  app.use("/__cv", async (req, res) => {
-    const send = (status, data) => {
-      res.statusCode = status;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify(data));
-    };
-    // A custom header can't be sent cross-site without a CORS preflight,
-    // which we never answer, so other websites can't call this API.
-    if (req.headers["x-cv-admin"] !== "1") {
-      return send(403, { error: "Missing X-CV-Admin header" });
-    }
-    try {
-      const [, resource, id] = req.url.split("?")[0].split("/");
-      const route = `${req.method} ${resource}${id ? "/:id" : ""}`;
-      switch (route) {
-        case "GET state":
-          return send(200, state());
-        case "GET variants/:id":
-          return send(200, readJson(variantPath(id)));
-        case "PUT variants/:id": {
-          const variant = await readBody(req);
-          if (variant.id !== id)
-            throw new Error("Variant id does not match URL");
-          validateVariant(variant);
-          writeJson(variantPath(id), variant);
-          return send(200, { ok: true });
-        }
-        case "POST preview":
-          return send(200, { pages: validateVariant(await readBody(req)) });
-        case "POST publish/:id":
-          variantPath(id); // validates the id
-          return send(200, publish(id));
-        case "POST timeline":
-          return send(200, { count: publishTimeline().items.length });
-        case "PUT profile":
-          return send(200, { profile: saveProfile(await readBody(req)) });
-        case "PUT entries/:id":
-          return send(200, { entry: saveEntry(id, await readBody(req)) });
-        case "DELETE entries/:id":
-          deleteEntry(id);
-          return send(200, { ok: true });
-        default:
-          send(404, { error: "Not found" });
+// The request handler, mounted under /__cv. Exposed on its own so the dev
+// server can reload this module per request while it's being worked on.
+async function handle(req, res) {
+  const send = (status, data) => {
+    res.statusCode = status;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(data));
+  };
+  // A custom header can't be sent cross-site without a CORS preflight,
+  // which we never answer, so other websites can't call this API.
+  if (req.headers["x-cv-admin"] !== "1") {
+    return send(403, { error: "Missing X-CV-Admin header" });
+  }
+  try {
+    const [, resource, id] = req.url.split("?")[0].split("/");
+    const route = `${req.method} ${resource}${id ? "/:id" : ""}`;
+    switch (route) {
+      case "GET state":
+        return send(200, state());
+      case "GET variants/:id":
+        return send(200, readJson(variantPath(id)));
+      case "PUT variants/:id": {
+        const variant = await readBody(req);
+        if (variant.id !== id) throw new Error("Variant id does not match URL");
+        validateVariant(variant);
+        writeJson(variantPath(id), variant);
+        return send(200, { ok: true });
       }
-    } catch (err) {
-      send(400, { error: err.message });
+      case "POST preview":
+        return send(200, { pages: validateVariant(await readBody(req)) });
+      case "POST publish/:id":
+        variantPath(id); // validates the id
+        return send(200, publish(id));
+      case "POST timeline":
+        return send(200, { count: publishTimeline().items.length });
+      case "PUT profile":
+        return send(200, { profile: saveProfile(await readBody(req)) });
+      case "PUT entries/:id":
+        return send(200, { entry: saveEntry(id, await readBody(req)) });
+      case "DELETE entries/:id":
+        deleteEntry(id);
+        return send(200, { ok: true });
+      default:
+        send(404, { error: "Not found" });
     }
-  });
+  } catch (err) {
+    send(400, { error: err.message });
+  }
+}
+
+module.exports = function mountCvApi(app) {
+  app.use("/__cv", handle);
 };
+module.exports.handle = handle;

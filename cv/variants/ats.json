@@ -7,27 +7,17 @@
   "sections": [
     {
       "section": "experience",
-      "refs": ["job-rad", "job-smartterm", "job-smartmatic", "job-hyuna"]
-    },
-    { "section": "education", "refs": ["edu-msc-nottingham", "edu-bsc-uwi"] },
-    {
-      "section": "competencies",
       "refs": [
-        "comp-agile",
-        "comp-cicd",
-        "comp-tdd",
-        "comp-jira",
-        "comp-microservices",
-        "comp-mentorship"
+        "job-wsc",
+        "job-rad",
+        "job-smartterm",
+        "job-smartmatic",
+        "job-hyuna"
       ]
     },
     {
-      "section": "achievements",
-      "refs": ["ach-startup-weekend", "ach-research-paper"]
-    },
-    {
-      "section": "interests",
-      "refs": ["int-hardware", "int-cricket", "int-pwa-research"]
+      "section": "education",
+      "refs": ["edu-msc-nottingham", "edu-bsc-uwi"]
     },
     {
       "section": "skills",
@@ -51,6 +41,28 @@
         "skill-sql"
       ]
     },
-    { "section": "projects", "refs": ["proj-chat-pwa", "proj-dominoes"] }
+    {
+      "section": "competencies",
+      "refs": [
+        "comp-agile",
+        "comp-cicd",
+        "comp-tdd",
+        "comp-jira",
+        "comp-microservices",
+        "comp-mentorship"
+      ]
+    },
+    {
+      "section": "interests",
+      "refs": ["int-hardware", "int-cricket", "int-pwa-research"]
+    },
+    {
+      "section": "achievements",
+      "refs": ["ach-startup-weekend", "ach-research-paper"]
+    },
+    {
+      "section": "projects",
+      "refs": ["proj-chat-pwa", "proj-dominoes"]
+    }
   ]
 }

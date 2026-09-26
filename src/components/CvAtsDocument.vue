@@ -55,6 +55,23 @@ const contactLine = computed(() =>
               v-html="detail"
             ></li>
           </ul>
+          <div
+            v-for="(eng, e) in job.engagements"
+            :key="e"
+            class="ats__engagement"
+          >
+            <p class="ats__meta">
+              <strong>{{ eng.client }}</strong>
+              <template v-if="eng.dates"> | {{ eng.dates }}</template>
+            </p>
+            <ul v-if="eng.details.length">
+              <li
+                v-for="(detail, d) in eng.details"
+                :key="d"
+                v-html="detail"
+              ></li>
+            </ul>
+          </div>
         </article>
       </section>
 
@@ -171,6 +188,10 @@ const contactLine = computed(() =>
 .ats__meta {
   margin: 0 0 3pt;
   font-style: italic;
+}
+
+.ats__engagement {
+  margin: 4pt 0 0 12pt;
 }
 
 .ats__item {

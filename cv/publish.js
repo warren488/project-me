@@ -20,6 +20,11 @@ const SECTION_KINDS = {
   interests: "interest",
 };
 
+// Engagements (clients worked with under a job) never appear in a variant
+// directly: they render under their parent job, and on the timeline.
+const ENGAGEMENT_KIND = "engagement";
+const KINDS = [...Object.values(SECTION_KINDS), ENGAGEMENT_KIND];
+
 const MONTHS = [
   "Jan",
   "Feb",
@@ -149,6 +154,21 @@ function resolveVariant(library, variant) {
     });
   };
 
+  // Engagements under a job, newest first. Undated ones keep file order.
+  const engagementsOf = (job) =>
+    library.entries
+      .filter((e) => e.kind === ENGAGEMENT_KIND && e.parent === job.id)
+      .sort(
+        (a, b) =>
+          (b.start ? monthIndex(b.start) : -1) -
+          (a.start ? monthIndex(a.start) : -1)
+      )
+      .map((e) => ({
+        client: e.title,
+        dates: formatRange(e),
+        details: (e.bullets || []).map((b) => b.text),
+      }));
+
   // --- Cut the list into sheets ---
   // sheet = { order: [section...], items: { section: [{entry, ref}] }, continued: Set }
   const newSheet = () => ({ order: [], items: {}, continued: new Set() });
@@ -240,12 +260,18 @@ function resolveVariant(library, variant) {
           out.skills[entry.category].push(entry.title);
         }
       } else if (section === "experience") {
-        out.experience = items(section).map(({ entry, ref }) => ({
-          title: entry.title,
-          company: entry.org,
-          dates: formatRange(entry),
-          details: pickBullets(entry, ref),
-        }));
+        out.experience = items(section).map(({ entry, ref }) => {
+          const job = {
+            title: entry.title,
+            company: entry.org,
+            dates: formatRange(entry),
+            details: pickBullets(entry, ref),
+          };
+          const wanted = typeof ref === "string" || ref.engagements !== false;
+          const engagements = wanted ? engagementsOf(entry) : [];
+          if (engagements.length) job.engagements = engagements;
+          return job;
+        });
       } else if (section === "interests") {
         out.interests = items(section).map(({ entry }) => ({
           name: entry.title,
@@ -265,7 +291,7 @@ function resolveVariant(library, variant) {
 
 // Entry kinds shown on the public timeline unless the entry says otherwise
 // with `timeline: true|false`. Anything undated is never shown.
-const TIMELINE_DEFAULT_KINDS = ["job", "education"];
+const TIMELINE_DEFAULT_KINDS = ["job", ENGAGEMENT_KIND, "education"];
 
 const onTimeline = (entry) =>
   !!entry.start &&
@@ -277,10 +303,16 @@ const onTimeline = (entry) =>
 // contact details.
 function resolveTimeline(library) {
   const endOf = (e) => (e.end ? monthIndex(e.end) : Infinity);
+  // Newest first. A job that starts the same month as one of its own
+  // engagements sits below it, so its rail starts at the job and runs up.
+  const nest = (a, b) => (a.parent === b.id ? -1 : b.parent === a.id ? 1 : 0);
   return library.entries
     .filter(onTimeline)
     .sort(
-      (a, b) => monthIndex(b.start) - monthIndex(a.start) || endOf(b) - endOf(a)
+      (a, b) =>
+        monthIndex(b.start) - monthIndex(a.start) ||
+        nest(a, b) ||
+        endOf(b) - endOf(a)
     )
     .map((entry) => {
       const item = {
@@ -293,6 +325,7 @@ function resolveTimeline(library) {
         tags: entry.tags,
       };
       if (entry.org) item.org = entry.org;
+      if (entry.parent) item.parent = entry.parent;
       if (entry.details) item.details = entry.details;
       if (entry.tech) item.tech = entry.tech;
       if (entry.bullets) item.bullets = entry.bullets.map((b) => b.text);
@@ -302,6 +335,7 @@ function resolveTimeline(library) {
 
 function publishTimeline() {
   const library = readJson(path.join(CV_DIR, "library.json"));
+  checkEngagements(library);
   const timeline = {
     name: library.profile.name,
     items: resolveTimeline(library),
@@ -313,20 +347,57 @@ function publishTimeline() {
   return timeline;
 }
 
-function publish(variantId = "full") {
+// Every engagement must point at a job that exists.
+function checkEngagements(library) {
+  const byId = new Map(library.entries.map((e) => [e.id, e]));
+  for (const e of library.entries) {
+    if (e.kind !== ENGAGEMENT_KIND) continue;
+    const parent = e.parent && byId.get(e.parent);
+    if (!parent || parent.kind !== "job")
+      throw new Error(
+        `engagement "${e.id}" needs a parent job (got "${e.parent}")`
+      );
+  }
+}
+
+const PUBLISHED_FILE = path.join(CV_DIR, "published.json");
+
+// The site publishes one variant per layout: the rich two-column CV it shows
+// on screen, and the plain ATS one it offers when printing.
+const SITE_DEFAULTS = ["full", "ats"];
+
+function readPublished() {
+  try {
+    const data = readJson(PUBLISHED_FILE);
+    // Files from before per-layout publishing held a single variant.
+    if (data && !data.pages) {
+      return { styled: data.styled || null, ats: data.ats || null };
+    }
+  } catch (err) {
+    // nothing published yet
+  }
+  return { styled: null, ats: null };
+}
+
+// Publishes each variant into the slot for its layout, keeping the other
+// slot as it was. Returns the whole published site.
+function publish(variantIds = SITE_DEFAULTS) {
+  const ids = Array.isArray(variantIds) ? variantIds : [variantIds];
   const library = readJson(path.join(CV_DIR, "library.json"));
-  const variant = readJson(path.join(CV_DIR, "variants", `${variantId}.json`));
-  const published = {
-    variant: variant.id,
-    layout: variant.layout || "styled",
-    pages: resolveVariant(library, variant),
-  };
-  fs.writeFileSync(
-    path.join(CV_DIR, "published.json"),
-    JSON.stringify(published, null, 2) + "\n"
-  );
+  checkEngagements(library);
+  const site = readPublished();
+  for (const id of ids) {
+    const variant = readJson(path.join(CV_DIR, "variants", `${id}.json`));
+    const layout = variant.layout || "styled";
+    site[layout] = {
+      variant: variant.id,
+      layout,
+      pages: resolveVariant(library, variant),
+    };
+  }
+  fs.writeFileSync(PUBLISHED_FILE, JSON.stringify(site, null, 2) + "\n");
   publishTimeline();
-  return published;
+  return site;
 }
 
 module.exports = {
@@ -336,18 +407,25 @@ module.exports = {
   SIDEBAR_SECTIONS,
   resolveTimeline,
   publish,
+  readPublished,
+  SITE_DEFAULTS,
   publishTimeline,
   onTimeline,
   formatRange,
   SECTION_KINDS,
+  ENGAGEMENT_KIND,
+  KINDS,
   TIMELINE_DEFAULT_KINDS,
   LAYOUTS,
 };
 
 if (require.main === module) {
   try {
-    const { variant } = publish(process.argv[2]);
-    console.log(`Published variant "${variant}" to cv/published.json`);
+    const ids = process.argv.slice(2);
+    const site = publish(ids.length ? ids : undefined);
+    for (const [layout, cv] of Object.entries(site)) {
+      if (cv) console.log(`Published "${cv.variant}" as the ${layout} CV`);
+    }
     console.log("Published cv/timeline.json");
   } catch (err) {
     console.error(err.message);

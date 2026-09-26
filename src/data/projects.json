@@ -1,0 +1,211 @@
+[
+  {
+    "id": "noez",
+    "title": "Noez",
+    "tagline": "Multiplayer Caribbean dominoes, on the web and in your pocket",
+    "description": "Live sessions with friends, spectators on the rail, table votes, stats and ranks, and play-by-play replays of every finished game. One React codebase ships as a web app, a PWA and an Android app. All writes go through Cloud Functions, with a tested Firestore rules suite guarding the read side.",
+    "tech": [
+      "React",
+      "TypeScript",
+      "Vite",
+      "Capacitor",
+      "Firebase Functions",
+      "Firestore"
+    ],
+    "year": 2026,
+    "status": "live",
+    "links": {
+      "live": "https://noes-246.web.app",
+      "source": "https://github.com/warren488/noez"
+    },
+    "tags": ["mobile", "realtime", "game"],
+    "featured": true
+  },
+  {
+    "id": "reo-bridge",
+    "title": "Reo Bridge",
+    "tagline": "Battery cameras for Frigate NVR",
+    "description": "Frigate expects always-on RTSP streams. Battery cameras sleep and only upload short motion clips over FTP. This bridge watches for clips and plays them through one persistent RTSP stream, filling the gaps with idle frames so Frigate never disconnects. Python, FFmpeg and MediaMTX in a container, with CI and a small web UI for tuning.",
+    "tech": ["Python", "FFmpeg", "MediaMTX", "Docker", "GitHub Actions"],
+    "year": 2026,
+    "status": "open-source",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/reolink-battery-to-frigate"
+    },
+    "tags": ["homelab", "video", "open-source"],
+    "featured": true
+  },
+  {
+    "id": "budgit",
+    "title": "Budgit",
+    "tagline": "Photograph a receipt, get a budget",
+    "description": "Snap a receipt and the line items, discounts, store and date are extracted and categorised for you. A Next.js app on Firebase with Genkit and Gemini for the understanding, backed by a self-hosted FastAPI and PaddleOCR service that pre-processes and reads the image so the model gets clean text.",
+    "tech": ["Next.js", "Firebase", "Genkit", "Gemini", "FastAPI", "PaddleOCR"],
+    "year": 2026,
+    "status": "in-progress",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/budgit-full"
+    },
+    "tags": ["ai", "ocr", "fintech"],
+    "featured": true
+  },
+  {
+    "id": "fitnese",
+    "title": "Fitnese",
+    "tagline": "Workout tracking that understands injuries and rehab",
+    "description": "An offline-first fitness PWA where exercises inherit from parents, target muscles hierarchically, and carry injury risk and rehabilitation metadata, so training can follow what your body actually needs. React 19 and Supabase, wrapped with Capacitor for Android.",
+    "tech": [
+      "React",
+      "TypeScript",
+      "Vite",
+      "Supabase",
+      "PostgreSQL",
+      "Capacitor",
+      "Workbox"
+    ],
+    "year": 2025,
+    "status": "live",
+    "links": {
+      "live": "https://fitenese-2.web.app",
+      "source": "https://github.com/warren488/fitnese-2"
+    },
+    "tags": ["pwa", "offline-first", "health"],
+    "featured": true
+  },
+  {
+    "id": "healthlog",
+    "title": "HealthLog",
+    "tagline": "One timeline for every condition you manage",
+    "description": "A multi-condition health logging PWA with consent-based sharing, so a doctor or caregiver sees only what you grant them. Next.js App Router with cookie-based Supabase auth, Serwist for offline, and a schema designed for scoped and revocable access.",
+    "tech": ["Next.js", "React", "Supabase", "Tailwind CSS", "Serwist"],
+    "year": 2026,
+    "status": "live",
+    "links": {
+      "live": "https://health-monitor-bay.vercel.app",
+      "source": "https://github.com/warren488/health-monitor"
+    },
+    "tags": ["pwa", "health", "privacy"],
+    "featured": true
+  },
+  {
+    "id": "homelab-monitoring",
+    "title": "Homelab monitoring",
+    "tagline": "Prometheus and Grafana for the rack at home",
+    "description": "A Docker Compose stack watching a Proxmox cluster and a TrueNAS box: node, SMART, cAdvisor, blackbox and Proxmox exporters into Prometheus, Grafana dashboards, and Alertmanager so I hear about a dying disk before it dies.",
+    "tech": [
+      "Prometheus",
+      "Grafana",
+      "Alertmanager",
+      "Docker Compose",
+      "Proxmox",
+      "TrueNAS"
+    ],
+    "year": 2026,
+    "status": "in-progress",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/monitoring"
+    },
+    "tags": ["homelab", "observability"],
+    "featured": true
+  },
+  {
+    "id": "web-chat",
+    "title": "Web Chat",
+    "tagline": "A chat PWA built to see how far the web could go",
+    "description": "Offline support with a service worker and IndexedDB, push notifications, voice notes, image sharing straight from the OS share sheet, friend requests, read receipts and typing indicators, and watching YouTube together with synced playback. Vue 2 on the front, Socket.IO and MongoDB behind it.",
+    "tech": ["Vue", "Socket.IO", "MongoDB", "Firebase", "Service Workers"],
+    "year": 2020,
+    "status": "live",
+    "links": {
+      "live": "https://webchat.scantlebury.io",
+      "source": "https://github.com/warren488/web-chat-app"
+    },
+    "tags": ["pwa", "realtime"],
+    "featured": true
+  },
+  {
+    "id": "project-me",
+    "title": "This site",
+    "tagline": "A CV that publishes itself",
+    "description": "The CV on this site is built from a library of reusable entries and named variants, each picking sections, bullets and page breaks. A publish step resolves a variant to JSON, the same data feeds the timeline page, and a dev-only dashboard edits it all. Print styles cut it into A4 sheets, with a plain single-column variant for applicant tracking systems.",
+    "tech": ["Vue 3", "TypeScript", "Firebase Hosting"],
+    "year": 2026,
+    "status": "live",
+    "links": {
+      "live": "https://warren.scantlebury.io",
+      "source": "https://github.com/warren488/project-me"
+    },
+    "tags": ["meta"],
+    "featured": false
+  },
+  {
+    "id": "bright-sparks",
+    "title": "Bright Sparks Tutoring",
+    "tagline": "Website and enrolment platform for a tutoring agency",
+    "description": "Client work through my consultancy: the public site plus a multi-step enrolment form, role-based admin dashboard and email notifications. Next.js and Firebase, with Cloud Functions, Cypress end-to-end tests, GitHub Actions deploys to Firebase App Hosting and a daily backup plan.",
+    "tech": [
+      "Next.js",
+      "React",
+      "Firebase",
+      "Cloud Functions",
+      "Cypress",
+      "GitHub Actions"
+    ],
+    "year": 2025,
+    "status": "client",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/studio-creation"
+    },
+    "tags": ["client"],
+    "featured": false
+  },
+  {
+    "id": "bsoe",
+    "title": "Barbados School of Education",
+    "tagline": "Official website for a school",
+    "description": "The public website for the Barbados School of Education, built with Vue 3 and Vite and hosted on Firebase.",
+    "tech": ["Vue 3", "TypeScript", "Vite", "Firebase Hosting"],
+    "year": 2022,
+    "status": "client",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/bsoe"
+    },
+    "tags": ["client"],
+    "featured": false
+  },
+  {
+    "id": "ebay-deal-finder",
+    "title": "eBay deal finder",
+    "tagline": "Scheduled marketplace searches with explainable ranking",
+    "description": "A self-hostable monorepo for scheduled marketplace searches, AI-assisted listing normalisation and ranking that shows its reasoning. Next.js 16, Supabase and a ports-and-adapters core so the marketplace and AI providers can be swapped.",
+    "tech": ["Next.js", "TypeScript", "Supabase", "pnpm workspaces"],
+    "year": 2026,
+    "status": "in-progress",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/ebay-shenanigans"
+    },
+    "tags": ["ai"],
+    "featured": false
+  },
+  {
+    "id": "comment-extractor",
+    "title": "Comment Extractor",
+    "tagline": "A VS Code extension for keeping long comments out of the code",
+    "description": "Point a short reference in the code at a longer explanation stored in another file, and read it in place from the editor.",
+    "tech": ["TypeScript", "VS Code API"],
+    "year": 2023,
+    "status": "in-progress",
+    "links": {
+      "live": null,
+      "source": "https://github.com/warren488/comment-extractor"
+    },
+    "tags": ["tooling"],
+    "featured": false
+  }
+]

@@ -1,72 +1,134 @@
 :root {
-  --primary: #242038;
-  --primary: #302956;
-  --primary: #2c3e50;
-  --secondary: #c9c9c9;
+  // Palette. Deep ink background, soft grey text, warm amber accent.
+  --primary: #151a2d;
+  --primary-soft: #1e2540;
+  --secondary: #d7dbe4;
+  --muted: #9aa3b8;
+  --line: rgba(215, 219, 228, 0.18);
+  --accent: #ffb454;
+  --accent-soft: rgba(255, 180, 84, 0.35);
+  --accent-contrast: #151a2d;
   --warn-light: #fffac2;
-  --tertiary: #42b983;
   --small-screen: 768px;
+
+  // Older name still used by a few components.
+  --tertiary: var(--accent);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: "Raleway", Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--secondary);
+  background-color: var(--primary);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 .primary-polkadot-bg {
   background-image: radial-gradient(
-    var(--secondary) 3%,
+    rgba(215, 219, 228, 0.35) 3%,
     var(--primary) 5%
   );
   background-position: 0 0;
   background-size: 15px 15px;
   background-color: var(--primary);
 }
-body {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  font-family: "Raleway", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: var(--secondary);
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  &:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
 }
 
 .nav-link {
   color: var(--secondary);
+  text-decoration: none;
   &:hover {
-    filter: drop-shadow(0px 0px 3px);
-    color: var(--secondary);
+    color: var(--accent);
+    text-decoration: none;
   }
 }
 
 .btn {
-  color: var(--tertiary);
-  border: solid 2px var(--tertiary);
+  color: var(--accent);
+  border: solid 2px var(--accent);
   border-radius: 0.5rem;
-  // text-decoration: underline;
-  font-weight: bold;
-  // background-color: var(--tertiary);
-  &:hover {
-    color: var(--primary);
-    background-color: var(--tertiary);
-    box-shadow: 0px 0px 5px 2px var(--tertiary);
+  font-weight: 600;
+  text-decoration: none;
+  &:hover,
+  &:focus-visible {
+    color: var(--accent-contrast);
+    background-color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+    text-decoration: none;
   }
 }
 
-.btn:focus,
-.nav-link:focus,
-.nav-link:focus-visible,
-a:focus {
-  outline: var(--tertiary);
-  box-shadow: 0 0 0 0.25rem var(--tertiary);
-  color: var(--tertiary);
+.btn--solid {
+  color: var(--accent-contrast);
+  background-color: var(--accent);
+  &:hover,
+  &:focus-visible {
+    filter: brightness(1.08);
+  }
 }
 
-// @media (prefers-color-scheme: light) {
-//   :root {
-//     // --primary: #2c3e50;
-//     --secondary: #2c3e50;
-//     --primary: #c9c9c9;
-//     --primary: white;
-//     --warn-light: #a89e30;
-//     --tertiary: #42b983;
-//     --small-screen: 768px;
-//   }
-//   .primary-polkadot-bg {
-//     // background-image: initial;
-//   }
-// }
+// One focus ring everywhere, only for keyboard focus.
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.btn:focus,
+.btn:focus-visible,
+.nav-link:focus,
+a:focus {
+  box-shadow: none;
+}
+.btn:focus-visible {
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.section-title {
+  font-weight: 800;
+  font-size: calc(1.3rem + 0.9vw);
+  margin-bottom: 0.25rem;
+}
+
+.section-lede {
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

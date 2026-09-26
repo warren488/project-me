@@ -8,6 +8,22 @@
   },
   "entries": [
     {
+      "id": "job-wsc",
+      "kind": "job",
+      "title": "Independent Software Consultant",
+      "org": "Warren Scantlebury Consulting",
+      "start": "2025-02",
+      "end": null,
+      "tags": ["fullstack", "devops", "consulting"],
+      "bullets": [
+        {
+          "id": "wsc-umbrella",
+          "text": "Sole trader consultancy taking on end-to-end product work for small businesses: scoping, build, deployment and handover, with the client owning the result.",
+          "tags": ["consulting", "fullstack"]
+        }
+      ]
+    },
+    {
       "id": "job-rad",
       "kind": "job",
       "title": "Software Engineering Consultant",
@@ -30,6 +46,72 @@
           "id": "rad-k8s",
           "text": "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>.",
           "tags": ["devops", "backend"]
+        }
+      ]
+    },
+    {
+      "id": "eng-ovo",
+      "kind": "engagement",
+      "parent": "job-rad",
+      "title": "OVO Energy",
+      "start": "2022-10",
+      "end": "2025-11",
+      "tags": ["client", "fullstack", "devops"],
+      "bullets": []
+    },
+    {
+      "id": "eng-direct-wines",
+      "kind": "engagement",
+      "parent": "job-rad",
+      "title": "Direct Wines",
+      "start": "2025-10",
+      "end": "2025-12",
+      "tags": ["client"],
+      "bullets": []
+    },
+    {
+      "id": "eng-jcdecaux",
+      "kind": "engagement",
+      "parent": "job-rad",
+      "title": "JCDecaux",
+      "start": "2026-01",
+      "end": "2026-03",
+      "tags": ["client"],
+      "bullets": []
+    },
+    {
+      "id": "eng-cakebox",
+      "kind": "engagement",
+      "parent": "job-rad",
+      "title": "Cakebox",
+      "start": "2026-04",
+      "end": "2026-09",
+      "tags": ["client"],
+      "bullets": []
+    },
+    {
+      "id": "eng-bright-sparks",
+      "kind": "engagement",
+      "parent": "job-wsc",
+      "title": "Bright Sparks Tutoring Agency",
+      "start": "2025-02",
+      "end": null,
+      "tags": ["client", "fullstack", "devops"],
+      "bullets": [
+        {
+          "id": "bs-bright-sparks",
+          "text": "Designed and delivered the public website and enrolment platform for <strong>Bright Sparks Tutoring Agency</strong> end to end, from requirements and copy through launch and handover.",
+          "tags": ["fullstack", "client"]
+        },
+        {
+          "id": "bs-stack",
+          "text": "Built it on <strong>Next.js, React and Firebase</strong> (Firestore, Auth, Cloud Functions): a multi-step enrolment form with validation, a role-based admin dashboard, and email notifications for new enrolments.",
+          "tags": ["fullstack", "frontend", "backend"]
+        },
+        {
+          "id": "bs-ops",
+          "text": "Owned delivery and operations: <strong>GitHub Actions</strong> deploys to Firebase App Hosting, Cypress end-to-end tests, honeypot and reCAPTCHA v3 bot protection, and a documented daily backup plan for submissions.",
+          "tags": ["devops"]
         }
       ]
     },
@@ -181,8 +263,18 @@
       "title": "CI/CD Pipelines",
       "tags": ["devops"]
     },
-    { "id": "comp-tdd", "kind": "competency", "title": "TDD", "tags": [] },
-    { "id": "comp-jira", "kind": "competency", "title": "JIRA", "tags": [] },
+    {
+      "id": "comp-tdd",
+      "kind": "competency",
+      "title": "TDD",
+      "tags": []
+    },
+    {
+      "id": "comp-jira",
+      "kind": "competency",
+      "title": "JIRA",
+      "tags": []
+    },
     {
       "id": "comp-microservices",
       "kind": "competency",

@@ -12,11 +12,19 @@ export interface Achievement {
   note?: string;
 }
 
+// A client engagement under a job (consultancy work), rendered as a sub-block.
+export interface Engagement {
+  client: string;
+  dates?: string;
+  details: string[];
+}
+
 export interface Experience {
   title: string;
   company: string;
   dates: string;
   details: string[]; // specific items can contain HTML strings like <strong>
+  engagements?: Engagement[];
 }
 
 export interface Project {
@@ -63,6 +71,13 @@ export interface PublishedCV {
   pages: CVPage[];
 }
 
+// cv/published.json: one variant per layout. The site shows the styled one
+// and offers either when printing.
+export interface PublishedSite {
+  styled: PublishedCV | null;
+  ats: PublishedCV | null;
+}
+
 // One checkpoint on the public timeline (cv/timeline.json).
 export interface TimelineItem {
   id: string;
@@ -76,6 +91,7 @@ export interface TimelineItem {
   tech?: string;
   tags: string[];
   bullets?: string[];
+  parent?: string; // engagements: the id of the job they sit under
 }
 
 export interface PublishedTimeline {
@@ -94,6 +110,7 @@ export interface Profile {
 
 export type EntryKind =
   | "job"
+  | "engagement" // a client worked with under a job; needs `parent`
   | "education"
   | "project"
   | "achievement"
@@ -113,6 +130,7 @@ export interface LibraryEntry {
   title: string;
   org?: string;
   category?: string; // skills only
+  parent?: string; // engagements only: the job id
   start?: string; // "YYYY" or "YYYY-MM"
   end?: string | null; // null = present
   details?: string;
@@ -141,7 +159,10 @@ export const SIDEBAR_SECTIONS: SectionName[] = [
 ];
 
 // "entry-id" = include every bullet; object form picks specific bullets.
-export type VariantRef = string | { id: string; bullets?: string[] };
+// `engagements: false` leaves a job's client engagements out.
+export type VariantRef =
+  | string
+  | { id: string; bullets?: string[]; engagements?: boolean };
 
 // A page break: between sections, or between refs of a main-column section.
 export interface PageBreak {

@@ -11,6 +11,7 @@ const props = defineProps<{
   knownCategories: string[];
   usage?: EntryUsage;
   timelineKinds: string[]; // kinds shown on the timeline by default
+  jobs?: LibraryEntry[]; // parents an engagement can sit under
   busy: boolean;
 }>();
 
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 
 const KIND_LABELS: Record<EntryKind, string> = {
   job: "Job",
+  engagement: "Client engagement",
   education: "Education",
   project: "Project",
   achievement: "Achievement",
@@ -32,6 +34,7 @@ const KIND_LABELS: Record<EntryKind, string> = {
 const KINDS = Object.keys(KIND_LABELS) as EntryKind[];
 const ID_PREFIX: Record<EntryKind, string> = {
   job: "job",
+  engagement: "eng",
   education: "edu",
   project: "proj",
   achievement: "ach",
@@ -41,9 +44,18 @@ const ID_PREFIX: Record<EntryKind, string> = {
 };
 
 // Which fields each kind uses, and what to call them.
-type Field = "org" | "category" | "dates" | "details" | "tech" | "bullets";
+type Field =
+  | "org"
+  | "parent"
+  | "category"
+  | "dates"
+  | "details"
+  | "tech"
+  | "bullets";
 const FIELDS: Record<EntryKind, Partial<Record<Field, string>>> = {
   job: { org: "Company", dates: "Dates", bullets: "Bullets" },
+  // Title is the client's name; the job it was through is the parent.
+  engagement: { parent: "Under job", dates: "Dates", bullets: "Bullets" },
   education: { org: "Institution", dates: "Dates", details: "Details" },
   project: {
     dates: "Dates (optional)",
@@ -80,6 +92,7 @@ const form = reactive({
   kind: "job" as EntryKind,
   title: "",
   org: "",
+  parent: "",
   category: "",
   start: "",
   end: "",
@@ -101,6 +114,7 @@ watch(
       kind: entry?.kind ?? "job",
       title: entry?.title ?? "",
       org: entry?.org ?? "",
+      parent: entry?.parent ?? "",
       category: entry?.category ?? "",
       start: entry?.start ?? "",
       end: entry?.end ?? "",
@@ -210,6 +224,7 @@ function toEntry(): LibraryEntry {
     tags: splitTags(form.tags),
   };
   if (fields.value.org && form.org.trim()) entry.org = form.org.trim();
+  if (fields.value.parent && form.parent) entry.parent = form.parent;
   if (fields.value.category) entry.category = form.category.trim();
   if (fields.value.dates && form.start.trim()) {
     entry.start = form.start.trim();
@@ -241,6 +256,8 @@ function submit() {
     return (message.value = `An entry with id "${entry.id}" already exists`);
   if (entry.kind === "skill" && !entry.category)
     return (message.value = "Skills need a category");
+  if (entry.kind === "engagement" && !entry.parent)
+    return (message.value = "An engagement needs a job to sit under");
   if (
     props.entry &&
     props.entry.kind !== entry.kind &&
@@ -313,6 +330,15 @@ function remove() {
       <label v-if="fields.org" class="col-12">
         <span class="entry-editor__label">{{ fields.org }}</span>
         <input v-model="form.org" class="form-control form-control-sm" />
+      </label>
+      <label v-if="fields.parent" class="col-12">
+        <span class="entry-editor__label">{{ fields.parent }}</span>
+        <select v-model="form.parent" class="form-select form-select-sm">
+          <option value="" disabled>Choose a job…</option>
+          <option v-for="j in props.jobs ?? []" :key="j.id" :value="j.id">
+            {{ j.title }}<template v-if="j.org"> · {{ j.org }}</template>
+          </option>
+        </select>
       </label>
       <label v-if="fields.category" class="col-12">
         <span class="entry-editor__label">{{ fields.category }}</span>

@@ -1,2 +1,5 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /admin
+
+Sitemap: https://warren.scantlebury.io/sitemap.xml

@@ -1,148 +1,401 @@
 {
-  "variant": "ats",
-  "layout": "ats",
-  "pages": [
-    {
-      "profile": {
-        "name": "Warren Scantlebury",
-        "title": "Full Stack Software Engineer",
-        "email": "warren.scantlebury@gmail.com",
-        "website": "warren.scantlebury.io",
-        "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives."
-      },
-      "sections": [
-        "experience",
-        "education",
-        "competencies",
-        "achievements",
-        "interests",
-        "skills",
-        "projects"
-      ],
-      "experience": [
-        {
-          "title": "Software Engineering Consultant",
-          "company": "The RAD Consulting Group",
-          "dates": "Oct 2022 – Oct 2026",
-          "details": [
-            "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
-            "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing <strong>GitOps</strong> workflows.",
-            "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>."
-          ]
+  "styled": {
+    "variant": "full",
+    "layout": "styled",
+    "pages": [
+      {
+        "profile": {
+          "name": "Warren Scantlebury",
+          "title": "Full Stack Software Engineer",
+          "email": "warren.scantlebury@gmail.com",
+          "website": "warren.scantlebury.io",
+          "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives."
         },
-        {
-          "title": "Software Engineer",
-          "company": "Smartterm Ltd",
-          "dates": "Jan 2021 – Jun 2021",
-          "details": [
-            "Developed high-performance educational platforms using Agile methodologies.",
-            "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito."
-          ]
-        },
-        {
-          "title": "Software Engineer",
-          "company": "Smartmatic International",
-          "dates": "Sep 2019 – Dec 2020",
-          "details": [
-            "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
-            "Co-developed a company-wide Design System focused on Accessibility using <strong>Web Components</strong> and Vue.js."
-          ]
-        },
-        {
-          "title": "Web Developer",
-          "company": "Hyuna International",
-          "dates": "May 2017 – Sep 2019",
-          "details": [
-            "Designed and deployed a critical internal RESTful API central to daily operations.",
-            "Developed serverless microservices using AWS Lambda and API Gateway."
-          ]
-        }
-      ],
-      "education": [
-        {
-          "degree": "MSc Computer Science",
-          "uni": "University of Nottingham",
-          "dates": "Sep 2021 – Sep 2022",
-          "details": "Distinction."
-        },
-        {
-          "degree": "BSc Computer Science",
-          "uni": "UWI Cave Hill",
-          "dates": "2014 – 2018",
-          "details": "(1:1) First Class Hons. Double Major."
-        }
-      ],
-      "competencies": [
-        "Agile & Scrum",
-        "CI/CD Pipelines",
-        "TDD",
-        "JIRA",
-        "Microservices Architecture",
-        "Junior Mentorship"
-      ],
-      "achievements": [
-        {
-          "role": "Startup Weekend Winner",
-          "org": "Google for Entrepreneurs",
-          "note": "Awarded 'Most Innovative Idea'"
-        },
-        {
-          "role": "Submitted Academic Research Paper (Under Review)",
-          "org": "Emerging Networks and Services in Developing Nations -- Barbados Use Case",
-          "note": "Co-authored with Supervising Professor, Dr. Milena Radenkovic"
-        }
-      ],
-      "interests": [
-        {
-          "name": "Hardware Tinkering",
-          "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
-        },
-        {
-          "name": "Cricket",
-          "desc": "Competitive play & Captaincy"
-        },
-        {
-          "name": "PWA Research",
-          "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
-        }
-      ],
-      "skills": {
-        "Frontend": [
-          "TypeScript",
-          "JavaScript",
-          "React",
-          "Next.js",
-          "Vue.js",
-          "Tailwind CSS"
+        "sections": [
+          "education",
+          "competencies",
+          "achievements",
+          "skills",
+          "experience"
         ],
-        "Backend": [
-          "Node.js",
-          "Express",
-          "RESTful APIs",
-          "GraphQL"
+        "education": [
+          {
+            "degree": "MSc Computer Science",
+            "uni": "University of Nottingham",
+            "dates": "Sep 2021 – Sep 2022",
+            "details": "Distinction."
+          },
+          {
+            "degree": "BSc Computer Science",
+            "uni": "UWI Cave Hill",
+            "dates": "2014 – 2018",
+            "details": "(1:1) First Class Hons. Double Major."
+          }
         ],
-        "DevOps & Cloud": [
-          "GCP",
-          "AWS Lambda",
-          "Kubernetes",
-          "Terraform",
-          "GitOps",
-          "Kafka",
-          "SQL"
+        "competencies": [
+          "Agile & Scrum",
+          "CI/CD Pipelines",
+          "TDD",
+          "JIRA",
+          "Microservices Architecture",
+          "Junior Mentorship"
+        ],
+        "achievements": [
+          {
+            "role": "Startup Weekend Winner",
+            "org": "Google for Entrepreneurs",
+            "note": "Awarded 'Most Innovative Idea'"
+          },
+          {
+            "role": "Submitted Academic Research Paper (Under Review)",
+            "org": "Emerging Networks and Services in Developing Nations -- Barbados Use Case",
+            "note": "Co-authored with Supervising Professor, Dr. Milena Radenkovic"
+          }
+        ],
+        "skills": {
+          "Frontend": [
+            "TypeScript",
+            "JavaScript",
+            "React",
+            "Next.js",
+            "Vue.js",
+            "Tailwind CSS"
+          ],
+          "Backend": [
+            "Node.js",
+            "Express",
+            "RESTful APIs",
+            "GraphQL"
+          ],
+          "DevOps & Cloud": [
+            "GCP",
+            "AWS Lambda",
+            "Kubernetes",
+            "Terraform",
+            "GitOps",
+            "Kafka",
+            "SQL"
+          ]
+        },
+        "experience": [
+          {
+            "title": "Independent Software Consultant",
+            "company": "Warren Scantlebury Consulting",
+            "dates": "Feb 2025 – Present",
+            "details": [
+              "Sole trader consultancy taking on end-to-end product work for small businesses: scoping, build, deployment and handover, with the client owning the result."
+            ],
+            "engagements": [
+              {
+                "client": "Bright Sparks Tutoring Agency",
+                "dates": "Feb 2025 – Present",
+                "details": [
+                  "Designed and delivered the public website and enrolment platform for <strong>Bright Sparks Tutoring Agency</strong> end to end, from requirements and copy through launch and handover.",
+                  "Built it on <strong>Next.js, React and Firebase</strong> (Firestore, Auth, Cloud Functions): a multi-step enrolment form with validation, a role-based admin dashboard, and email notifications for new enrolments.",
+                  "Owned delivery and operations: <strong>GitHub Actions</strong> deploys to Firebase App Hosting, Cypress end-to-end tests, honeypot and reCAPTCHA v3 bot protection, and a documented daily backup plan for submissions."
+                ]
+              }
+            ]
+          },
+          {
+            "title": "Software Engineering Consultant",
+            "company": "The RAD Consulting Group",
+            "dates": "Oct 2022 – Oct 2026",
+            "details": [
+              "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
+              "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing <strong>GitOps</strong> workflows.",
+              "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>."
+            ],
+            "engagements": [
+              {
+                "client": "Cakebox",
+                "dates": "Apr 2026 – Sep 2026",
+                "details": []
+              },
+              {
+                "client": "JCDecaux",
+                "dates": "Jan 2026 – Mar 2026",
+                "details": []
+              },
+              {
+                "client": "Direct Wines",
+                "dates": "Oct 2025 – Dec 2025",
+                "details": []
+              },
+              {
+                "client": "OVO Energy",
+                "dates": "Oct 2022 – Nov 2025",
+                "details": []
+              }
+            ]
+          },
+          {
+            "title": "Software Engineer",
+            "company": "Smartterm Ltd",
+            "dates": "Jan 2021 – Jun 2021",
+            "details": [
+              "Developed high-performance educational platforms using Agile methodologies.",
+              "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito."
+            ]
+          }
         ]
       },
-      "projects": [
-        {
-          "title": "Real-time Chat PWA",
-          "desc": "Engineered a PWA with real-time messaging, voice notes, and push notifications.",
-          "tech": "MongoDB • Socket.IO • Vue2"
+      {
+        "profile": {
+          "name": "Warren Scantlebury",
+          "title": "Full Stack Software Engineer",
+          "email": "warren.scantlebury@gmail.com",
+          "website": "warren.scantlebury.io"
         },
-        {
-          "title": "Dominoes Multiplayer PWA",
-          "desc": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
-          "tech": "Firebase • React"
-        }
-      ]
-    }
-  ]
+        "sections": [
+          "experience",
+          "interests",
+          "projects"
+        ],
+        "continued": [
+          "experience"
+        ],
+        "experience": [
+          {
+            "title": "Software Engineer",
+            "company": "Smartmatic International",
+            "dates": "Sep 2019 – Dec 2020",
+            "details": [
+              "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
+              "Co-developed a company-wide Design System focused on Accessibility using <strong>Web Components</strong> and Vue.js."
+            ]
+          },
+          {
+            "title": "Web Developer",
+            "company": "Hyuna International",
+            "dates": "May 2017 – Sep 2019",
+            "details": [
+              "Designed and deployed a critical internal RESTful API central to daily operations.",
+              "Developed serverless microservices using AWS Lambda and API Gateway."
+            ]
+          }
+        ],
+        "interests": [
+          {
+            "name": "Hardware Tinkering",
+            "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
+          },
+          {
+            "name": "Cricket",
+            "desc": "Competitive play & Captaincy"
+          },
+          {
+            "name": "PWA Research",
+            "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
+          }
+        ],
+        "projects": [
+          {
+            "title": "Real-time Chat PWA",
+            "desc": "Engineered a PWA with real-time messaging, voice notes, and push notifications.",
+            "tech": "MongoDB • Socket.IO • Vue2"
+          },
+          {
+            "title": "Dominoes Multiplayer PWA",
+            "desc": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
+            "tech": "Firebase • React"
+          },
+          {
+            "title": "Fitnese",
+            "desc": "Fitnese is an activity tracking app focused on detailed exercise metadata, injury risk tracking, rehabilitation benefits, and offline-first functionality.",
+            "tech": "capacitor vue PWA"
+          }
+        ]
+      }
+    ]
+  },
+  "ats": {
+    "variant": "ats",
+    "layout": "ats",
+    "pages": [
+      {
+        "profile": {
+          "name": "Warren Scantlebury",
+          "title": "Full Stack Software Engineer",
+          "email": "warren.scantlebury@gmail.com",
+          "website": "warren.scantlebury.io",
+          "summary": "Results-oriented Software Engineer with a Master’s in Computer Science and significant experience in building scalable web applications. Expert in <strong>TypeScript (Node.js/React)</strong> and <strong>DevOps (GCP/Kubernetes)</strong>. Proven track record of architecting serverless APIs and leading frontend initiatives."
+        },
+        "sections": [
+          "experience",
+          "education",
+          "skills",
+          "competencies",
+          "interests",
+          "achievements",
+          "projects"
+        ],
+        "experience": [
+          {
+            "title": "Independent Software Consultant",
+            "company": "Warren Scantlebury Consulting",
+            "dates": "Feb 2025 – Present",
+            "details": [
+              "Sole trader consultancy taking on end-to-end product work for small businesses: scoping, build, deployment and handover, with the client owning the result."
+            ],
+            "engagements": [
+              {
+                "client": "Bright Sparks Tutoring Agency",
+                "dates": "Feb 2025 – Present",
+                "details": [
+                  "Designed and delivered the public website and enrolment platform for <strong>Bright Sparks Tutoring Agency</strong> end to end, from requirements and copy through launch and handover.",
+                  "Built it on <strong>Next.js, React and Firebase</strong> (Firestore, Auth, Cloud Functions): a multi-step enrolment form with validation, a role-based admin dashboard, and email notifications for new enrolments.",
+                  "Owned delivery and operations: <strong>GitHub Actions</strong> deploys to Firebase App Hosting, Cypress end-to-end tests, honeypot and reCAPTCHA v3 bot protection, and a documented daily backup plan for submissions."
+                ]
+              }
+            ]
+          },
+          {
+            "title": "Software Engineering Consultant",
+            "company": "The RAD Consulting Group",
+            "dates": "Oct 2022 – Oct 2026",
+            "details": [
+              "Architected full-stack applications using <strong>TypeScript, React (Next.js), and Node.js</strong>, serving as a core contributor.",
+              "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing <strong>GitOps</strong> workflows.",
+              "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>."
+            ],
+            "engagements": [
+              {
+                "client": "Cakebox",
+                "dates": "Apr 2026 – Sep 2026",
+                "details": []
+              },
+              {
+                "client": "JCDecaux",
+                "dates": "Jan 2026 – Mar 2026",
+                "details": []
+              },
+              {
+                "client": "Direct Wines",
+                "dates": "Oct 2025 – Dec 2025",
+                "details": []
+              },
+              {
+                "client": "OVO Energy",
+                "dates": "Oct 2022 – Nov 2025",
+                "details": []
+              }
+            ]
+          },
+          {
+            "title": "Software Engineer",
+            "company": "Smartterm Ltd",
+            "dates": "Jan 2021 – Jun 2021",
+            "details": [
+              "Developed high-performance educational platforms using Agile methodologies.",
+              "Built secure video conferencing features in <strong>Next.js</strong> integrating AWS Chime SDK and AWS Cognito."
+            ]
+          },
+          {
+            "title": "Software Engineer",
+            "company": "Smartmatic International",
+            "dates": "Sep 2019 – Dec 2020",
+            "details": [
+              "<strong>Lead Frontend Developer</strong> for an Angular 9 election application, implementing complex Internationalization.",
+              "Co-developed a company-wide Design System focused on Accessibility using <strong>Web Components</strong> and Vue.js."
+            ]
+          },
+          {
+            "title": "Web Developer",
+            "company": "Hyuna International",
+            "dates": "May 2017 – Sep 2019",
+            "details": [
+              "Designed and deployed a critical internal RESTful API central to daily operations.",
+              "Developed serverless microservices using AWS Lambda and API Gateway."
+            ]
+          }
+        ],
+        "education": [
+          {
+            "degree": "MSc Computer Science",
+            "uni": "University of Nottingham",
+            "dates": "Sep 2021 – Sep 2022",
+            "details": "Distinction."
+          },
+          {
+            "degree": "BSc Computer Science",
+            "uni": "UWI Cave Hill",
+            "dates": "2014 – 2018",
+            "details": "(1:1) First Class Hons. Double Major."
+          }
+        ],
+        "skills": {
+          "Frontend": [
+            "TypeScript",
+            "JavaScript",
+            "React",
+            "Next.js",
+            "Vue.js",
+            "Tailwind CSS"
+          ],
+          "Backend": [
+            "Node.js",
+            "Express",
+            "RESTful APIs",
+            "GraphQL"
+          ],
+          "DevOps & Cloud": [
+            "GCP",
+            "AWS Lambda",
+            "Kubernetes",
+            "Terraform",
+            "GitOps",
+            "Kafka",
+            "SQL"
+          ]
+        },
+        "competencies": [
+          "Agile & Scrum",
+          "CI/CD Pipelines",
+          "TDD",
+          "JIRA",
+          "Microservices Architecture",
+          "Junior Mentorship"
+        ],
+        "interests": [
+          {
+            "name": "Hardware Tinkering",
+            "desc": "Raspberry Pi & Arduino, Home automation, Homelab setup"
+          },
+          {
+            "name": "Cricket",
+            "desc": "Competitive play & Captaincy"
+          },
+          {
+            "name": "PWA Research",
+            "desc": "Coding on the bleeding edge of web tech and Pushing web capabilities"
+          }
+        ],
+        "achievements": [
+          {
+            "role": "Startup Weekend Winner",
+            "org": "Google for Entrepreneurs",
+            "note": "Awarded 'Most Innovative Idea'"
+          },
+          {
+            "role": "Submitted Academic Research Paper (Under Review)",
+            "org": "Emerging Networks and Services in Developing Nations -- Barbados Use Case",
+            "note": "Co-authored with Supervising Professor, Dr. Milena Radenkovic"
+          }
+        ],
+        "projects": [
+          {
+            "title": "Real-time Chat PWA",
+            "desc": "Engineered a PWA with real-time messaging, voice notes, and push notifications.",
+            "tech": "MongoDB • Socket.IO • Vue2"
+          },
+          {
+            "title": "Dominoes Multiplayer PWA",
+            "desc": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
+            "tech": "Firebase • React"
+          }
+        ]
+      }
+    ]
+  }
 }
