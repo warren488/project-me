@@ -1,12 +1,7 @@
-// Resolves CV variants against the library and writes cv/published.json,
-// cv/timeline.json and src/data/projects.json: the only CV data the public
-// site imports.
-//
-// Usage: npm run cv:publish [variantIds...]   (defaults to full and ats)
-const fs = require("fs");
-const path = require("path");
-
-const CV_DIR = __dirname;
+// Resolves CV variants against the library and publishes what the public
+// site reads: the published CVs, the timeline and the project cards. Reads
+// and writes go through a store (see store.js), so the same code serves the
+// Cloud Function (Firestore) and the scripts in scripts/ (JSON files).
 
 // Which entry kind each page section accepts.
 const LAYOUTS = ["styled", "ats"];
@@ -51,10 +46,6 @@ function formatRange(entry) {
   if (!entry.start) return undefined;
   const end = entry.end ? formatDate(entry.end) : "Present";
   return `${formatDate(entry.start)} – ${end}`;
-}
-
-function readJson(file) {
-  return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 // Sections that live in the sidebar of the styled layout. The sidebar flows
@@ -394,17 +385,28 @@ function resolveTimeline(library) {
     });
 }
 
-function publishTimeline() {
-  const library = readJson(path.join(CV_DIR, "library.json"));
+// Every engagement must point at a job that exists.
+function checkEngagements(library) {
+  const byId = new Map(library.entries.map((e) => [e.id, e]));
+  for (const e of library.entries) {
+    if (e.kind !== ENGAGEMENT_KIND) continue;
+    const parent = e.parent && byId.get(e.parent);
+    if (!parent || parent.kind !== "job")
+      throw new Error(
+        `engagement "${e.id}" needs a parent job (got "${e.parent}")`
+      );
+  }
+}
+
+// The public timeline document.
+function siteTimeline(library) {
   checkEngagements(library);
-  const timeline = {
-    name: library.profile.name,
-    items: resolveTimeline(library),
-  };
-  fs.writeFileSync(
-    path.join(CV_DIR, "timeline.json"),
-    JSON.stringify(timeline, null, 2) + "\n"
-  );
+  return { name: library.profile.name, items: resolveTimeline(library) };
+}
+
+async function publishTimeline(store) {
+  const timeline = siteTimeline(await store.readLibrary());
+  await store.updateSite({ timeline });
   return timeline;
 }
 
@@ -413,7 +415,6 @@ function publishTimeline() {
 // (and the private notes on any entry) never leave the library.
 const PROJECT_STATUSES = ["live", "open-source", "in-progress", "client"];
 const PROJECT_HOMES = ["featured", "more", "hidden"];
-const PROJECTS_FILE = path.join(CV_DIR, "..", "src", "data", "projects.json");
 
 function resolveProjects(library) {
   return library.entries
@@ -445,65 +446,56 @@ function resolveProjects(library) {
     .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
 }
 
-function publishProjects() {
-  const library = readJson(path.join(CV_DIR, "library.json"));
-  const projects = resolveProjects(library);
-  fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2) + "\n");
+async function publishProjects(store) {
+  const projects = resolveProjects(await store.readLibrary());
+  await store.updateSite({ projects });
   return projects;
 }
 
-// Every engagement must point at a job that exists.
-function checkEngagements(library) {
-  const byId = new Map(library.entries.map((e) => [e.id, e]));
-  for (const e of library.entries) {
-    if (e.kind !== ENGAGEMENT_KIND) continue;
-    const parent = e.parent && byId.get(e.parent);
-    if (!parent || parent.kind !== "job")
-      throw new Error(
-        `engagement "${e.id}" needs a parent job (got "${e.parent}")`
-      );
-  }
+// Everything on the site that comes straight from the library, in one write.
+// Every library save triggers this; the CVs need a publish step instead.
+async function publishSiteData(store) {
+  const library = await store.readLibrary();
+  const timeline = siteTimeline(library);
+  const projects = resolveProjects(library);
+  await store.updateSite({ timeline, projects });
+  return { count: timeline.items.length, projects: projects.length };
 }
-
-const PUBLISHED_FILE = path.join(CV_DIR, "published.json");
 
 // The site publishes one variant per layout: the rich two-column CV it shows
 // on screen, and the plain ATS one it offers when printing.
 const SITE_DEFAULTS = ["full", "ats"];
 
-function readPublished() {
-  try {
-    const data = readJson(PUBLISHED_FILE);
-    // Files from before per-layout publishing held a single variant.
-    if (data && !data.pages) {
-      return { styled: data.styled || null, ats: data.ats || null };
-    }
-  } catch (err) {
-    // nothing published yet
-  }
-  return { styled: null, ats: null };
+async function readPublished(store) {
+  const { published } = await store.readSite();
+  return {
+    styled: (published && published.styled) || null,
+    ats: (published && published.ats) || null,
+  };
 }
 
 // Publishes each variant into the slot for its layout, keeping the other
-// slot as it was. Returns the whole published site.
-function publish(variantIds = SITE_DEFAULTS) {
+// slot as it was, and refreshes the timeline and projects alongside so the
+// whole site bundle is written once. Returns the published CVs.
+async function publish(store, variantIds = SITE_DEFAULTS) {
   const ids = Array.isArray(variantIds) ? variantIds : [variantIds];
-  const library = readJson(path.join(CV_DIR, "library.json"));
-  checkEngagements(library);
-  const site = readPublished();
+  const library = await store.readLibrary();
+  const published = await readPublished(store);
   for (const id of ids) {
-    const variant = readJson(path.join(CV_DIR, "variants", `${id}.json`));
+    const variant = await store.readVariant(id);
     const layout = variant.layout || "styled";
-    site[layout] = {
+    published[layout] = {
       variant: variant.id,
       layout,
       pages: resolveVariant(library, variant),
     };
   }
-  fs.writeFileSync(PUBLISHED_FILE, JSON.stringify(site, null, 2) + "\n");
-  publishTimeline();
-  publishProjects();
-  return site;
+  await store.updateSite({
+    published,
+    timeline: siteTimeline(library),
+    projects: resolveProjects(library),
+  });
+  return published;
 }
 
 module.exports = {
@@ -514,10 +506,13 @@ module.exports = {
   engagementPick,
   resolveProjects,
   publishProjects,
+  publishSiteData,
   PROJECT_STATUSES,
   PROJECT_HOMES,
   SIDEBAR_SECTIONS,
   resolveTimeline,
+  siteTimeline,
+  checkEngagements,
   publish,
   readPublished,
   SITE_DEFAULTS,
@@ -530,17 +525,3 @@ module.exports = {
   TIMELINE_DEFAULT_KINDS,
   LAYOUTS,
 };
-
-if (require.main === module) {
-  try {
-    const ids = process.argv.slice(2);
-    const site = publish(ids.length ? ids : undefined);
-    for (const [layout, cv] of Object.entries(site)) {
-      if (cv) console.log(`Published "${cv.variant}" as the ${layout} CV`);
-    }
-    console.log("Published cv/timeline.json and src/data/projects.json");
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-}

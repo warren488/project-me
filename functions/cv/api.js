@@ -1,19 +1,21 @@
-// Local-only API used by the /admin dashboard. It is mounted on the dev server
-// (see vue.config.js) and never exists in the production build.
-const fs = require("fs");
-const path = require("path");
+// The API behind the /admin dashboard. createHandler() returns a plain
+// (req, res) function: the Cloud Function in ../index.js mounts it with a
+// Firestore store and Firebase Auth; a script can mount it with a file store
+// and no auth. Everything the site can show is written by publish.js; this
+// module only decides what is stored.
 const {
   resolveVariant,
   eachRef,
   publish,
+  publishSiteData,
   readPublished,
-  publishTimeline,
-  publishProjects,
+  checkEngagements,
   refId,
   engagementPick,
   formatRange,
   SECTION_KINDS,
   SIDEBAR_SECTIONS,
+  SITE_DEFAULTS,
   TIMELINE_DEFAULT_KINDS,
   KINDS,
   ENGAGEMENT_KIND,
@@ -21,26 +23,13 @@ const {
   PROJECT_HOMES,
 } = require("./publish");
 
-const CV_DIR = __dirname;
-const LIBRARY_FILE = path.join(CV_DIR, "library.json");
-const VARIANTS_DIR = path.join(CV_DIR, "variants");
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
-const URL = /^https?:\/\/\S+$/;
+const HTTP_URL = /^https?:\/\/\S+$/;
 
-// Everything the site can show about an entry is written by publish.js; the
-// dev API only decides what is stored. Engagements of a job.
 const engagementsOf = (library, jobId) =>
   library.entries.filter(
     (e) => e.kind === ENGAGEMENT_KIND && e.parent === jobId
-  );
-
-const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
-// Written through prettier so the files match what lint-staged would produce.
-const writeJson = (file, data) =>
-  fs.writeFileSync(
-    file,
-    require("prettier").format(JSON.stringify(data), { parser: "json" })
   );
 
 const checkId = (id, what = "id") => {
@@ -49,20 +38,17 @@ const checkId = (id, what = "id") => {
   return id;
 };
 
-const variantPath = (id) => path.join(VARIANTS_DIR, `${checkId(id)}.json`);
-
-const readVariants = () =>
-  fs
-    .readdirSync(VARIANTS_DIR)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => readJson(path.join(VARIANTS_DIR, f)));
-
+// Express (in the Cloud Function) has already parsed a JSON body; a bare
+// Node server hasn't.
 function readBody(req) {
+  if (req.body !== undefined && typeof req.body === "object") {
+    return Promise.resolve(req.body || {});
+  }
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1e6) reject(new Error("Request body too large"));
+      if (body.length > 2e6) reject(new Error("Request body too large"));
     });
     req.on("end", () => {
       try {
@@ -110,39 +96,6 @@ function usage(library, variants) {
     });
   }
   return map;
-}
-
-function state() {
-  const library = readJson(LIBRARY_FILE);
-  const variants = readVariants();
-  const used = usage(library, variants);
-  for (const entry of library.entries) {
-    entry.displayDates = formatRange(entry);
-  }
-  // Which variant fills each layout slot on the site.
-  const site = readPublished();
-  const published = {
-    styled: site.styled ? site.styled.variant : null,
-    ats: site.ats ? site.ats.variant : null,
-  };
-  return {
-    library,
-    sections: SECTION_KINDS,
-    sidebarSections: SIDEBAR_SECTIONS,
-    timelineKinds: TIMELINE_DEFAULT_KINDS,
-    variants: variants.map(({ id, name, layout }) => ({
-      id,
-      name,
-      layout: layout || "styled",
-    })),
-    published,
-    usage: used,
-  };
-}
-
-function validateVariant(variant) {
-  if (!variant || typeof variant !== "object") throw new Error("No variant");
-  return resolveVariant(readJson(LIBRARY_FILE), variant);
 }
 
 // --- Library entries ---
@@ -266,7 +219,7 @@ function cleanProject(input, entry) {
     for (const key of ["live", "source"]) {
       const url = optionalString(input.links, key);
       if (!url) continue;
-      if (!URL.test(url)) throw new Error(`The ${key} link must be a URL`);
+      if (!HTTP_URL.test(url)) throw new Error(`The ${key} link must be a URL`);
       links[key] = url;
     }
     if (Object.keys(links).length) entry.links = links;
@@ -326,7 +279,7 @@ function checkEntryStillFits(entry, variants) {
 
 const PROFILE_FIELDS = ["name", "location", "phone", "email", "website"];
 
-function saveProfile(input) {
+function cleanProfile(input) {
   if (!input || typeof input !== "object") throw new Error("No profile");
   const profile = {};
   for (const key of PROFILE_FIELDS) {
@@ -336,122 +289,221 @@ function saveProfile(input) {
   for (const key of ["name", "email", "website"]) {
     if (!profile[key]) throw new Error(`Profile ${key} is required`);
   }
-  const library = readJson(LIBRARY_FILE);
-  library.profile = profile;
-  writeJson(LIBRARY_FILE, library);
-  publishSiteData();
   return profile;
 }
 
-function saveEntry(id, input) {
-  const entry = cleanEntry(input);
-  if (entry.id !== id) throw new Error("Entry id does not match URL");
-  const library = readJson(LIBRARY_FILE);
-  checkEntryStillFits(entry, readVariants());
-  if (entry.kind === ENGAGEMENT_KIND) {
-    const parent = library.entries.find((e) => e.id === entry.parent);
-    if (!parent || parent.kind !== "job")
-      throw new Error(
-        `"${entry.parent}" is not a job, so it can't be the parent`
-      );
-    if (parent.id === entry.id)
-      throw new Error("An engagement can't be its own parent");
-  }
-  const index = library.entries.findIndex((e) => e.id === id);
-  if (index === -1) library.entries.push(entry);
-  else library.entries[index] = entry;
-  writeJson(LIBRARY_FILE, library);
-  // The timeline and project cards need no selection step, so keep them in
-  // sync automatically.
-  publishSiteData();
-  return entry;
-}
-
-// Everything on the site that comes straight from the library.
-function publishSiteData() {
-  const timeline = publishTimeline();
-  const projects = publishProjects();
-  return { count: timeline.items.length, projects: projects.length };
-}
-
-function deleteEntry(id) {
-  checkId(id, "entry id");
-  const library = readJson(LIBRARY_FILE);
-  const index = library.entries.findIndex((e) => e.id === id);
-  if (index === -1) throw new Error(`No entry "${id}"`);
-  const clients = library.entries.filter(
-    (e) => e.kind === ENGAGEMENT_KIND && e.parent === id
-  );
-  if (clients.length)
-    throw new Error(
-      `"${id}" still has engagements under it (${clients
-        .map((e) => e.id)
-        .join(", ")}). Move or delete those first.`
-    );
-  const users = (usage(library, readVariants())[id] || {}).variants || [];
-  if (users.length) {
-    throw new Error(
-      `"${id}" is used by variant${users.length > 1 ? "s" : ""} ${users
-        .map((v) => `"${v}"`)
-        .join(", ")}. Remove it there first.`
-    );
-  }
-  library.entries.splice(index, 1);
-  writeJson(LIBRARY_FILE, library);
-  publishSiteData();
-}
-
-// The request handler, mounted under /__cv. Exposed on its own so the dev
-// server can reload this module per request while it's being worked on.
-async function handle(req, res) {
-  const send = (status, data) => {
-    res.statusCode = status;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify(data));
-  };
-  // A custom header can't be sent cross-site without a CORS preflight,
-  // which we never answer, so other websites can't call this API.
-  if (req.headers["x-cv-admin"] !== "1") {
-    return send(403, { error: "Missing X-CV-Admin header" });
-  }
-  try {
-    const [, resource, id] = req.url.split("?")[0].split("/");
-    const route = `${req.method} ${resource}${id ? "/:id" : ""}`;
-    switch (route) {
-      case "GET state":
-        return send(200, state());
-      case "GET variants/:id":
-        return send(200, readJson(variantPath(id)));
-      case "PUT variants/:id": {
-        const variant = await readBody(req);
-        if (variant.id !== id) throw new Error("Variant id does not match URL");
-        validateVariant(variant);
-        writeJson(variantPath(id), variant);
-        return send(200, { ok: true });
-      }
-      case "POST preview":
-        return send(200, { pages: validateVariant(await readBody(req)) });
-      case "POST publish/:id":
-        variantPath(id); // validates the id
-        return send(200, publish(id));
-      case "POST timeline":
-        return send(200, publishSiteData());
-      case "PUT profile":
-        return send(200, { profile: saveProfile(await readBody(req)) });
-      case "PUT entries/:id":
-        return send(200, { entry: saveEntry(id, await readBody(req)) });
-      case "DELETE entries/:id":
-        deleteEntry(id);
-        return send(200, { ok: true });
-      default:
-        send(404, { error: "Not found" });
+// --- Everything that touches a store ---
+function createHandler({ store, authorize, prefix = "" }) {
+  async function state() {
+    const [library, variants, site] = await Promise.all([
+      store.readLibrary(),
+      store.listVariants(),
+      readPublished(store),
+    ]);
+    const used = usage(library, variants);
+    for (const entry of library.entries) {
+      entry.displayDates = formatRange(entry);
     }
-  } catch (err) {
-    send(400, { error: err.message });
+    return {
+      library,
+      sections: SECTION_KINDS,
+      sidebarSections: SIDEBAR_SECTIONS,
+      timelineKinds: TIMELINE_DEFAULT_KINDS,
+      variants: variants.map(({ id, name, layout }) => ({
+        id,
+        name,
+        layout: layout || "styled",
+      })),
+      // Which variant fills each layout slot on the site.
+      published: {
+        styled: site.styled ? site.styled.variant : null,
+        ats: site.ats ? site.ats.variant : null,
+      },
+      usage: used,
+    };
   }
+
+  async function validateVariant(variant) {
+    if (!variant || typeof variant !== "object") throw new Error("No variant");
+    return resolveVariant(await store.readLibrary(), variant);
+  }
+
+  async function saveProfile(input) {
+    const profile = cleanProfile(input);
+    const library = await store.readLibrary();
+    library.profile = profile;
+    await store.writeLibrary(library);
+    await publishSiteData(store);
+    return profile;
+  }
+
+  async function saveEntry(id, input) {
+    const entry = cleanEntry(input);
+    if (entry.id !== id) throw new Error("Entry id does not match URL");
+    const [library, variants] = await Promise.all([
+      store.readLibrary(),
+      store.listVariants(),
+    ]);
+    checkEntryStillFits(entry, variants);
+    if (entry.kind === ENGAGEMENT_KIND) {
+      const parent = library.entries.find((e) => e.id === entry.parent);
+      if (!parent || parent.kind !== "job")
+        throw new Error(
+          `"${entry.parent}" is not a job, so it can't be the parent`
+        );
+      if (parent.id === entry.id)
+        throw new Error("An engagement can't be its own parent");
+    }
+    const index = library.entries.findIndex((e) => e.id === id);
+    if (index === -1) library.entries.push(entry);
+    else library.entries[index] = entry;
+    await store.writeLibrary(library);
+    // The timeline and project cards need no selection step, so keep them in
+    // sync automatically.
+    await publishSiteData(store);
+    return entry;
+  }
+
+  async function deleteEntry(id) {
+    checkId(id, "entry id");
+    const [library, variants] = await Promise.all([
+      store.readLibrary(),
+      store.listVariants(),
+    ]);
+    const index = library.entries.findIndex((e) => e.id === id);
+    if (index === -1) throw new Error(`No entry "${id}"`);
+    const clients = engagementsOf(library, id);
+    if (clients.length)
+      throw new Error(
+        `"${id}" still has engagements under it (${clients
+          .map((e) => e.id)
+          .join(", ")}). Move or delete those first.`
+      );
+    const users = (usage(library, variants)[id] || {}).variants || [];
+    if (users.length) {
+      throw new Error(
+        `"${id}" is used by variant${users.length > 1 ? "s" : ""} ${users
+          .map((v) => `"${v}"`)
+          .join(", ")}. Remove it there first.`
+      );
+    }
+    library.entries.splice(index, 1);
+    await store.writeLibrary(library);
+    await publishSiteData(store);
+  }
+
+  // A bundle is a backup of everything editable: the library, the variants,
+  // and (informationally) the site output. Import replaces the lot, then
+  // regenerates the site output from the imported data.
+  async function exportBundle() {
+    const [library, variants, site] = await Promise.all([
+      store.readLibrary(),
+      store.listVariants(),
+      store.readSite(),
+    ]);
+    return { exportedAt: new Date().toISOString(), library, variants, site };
+  }
+
+  async function importBundle(bundle) {
+    if (!bundle || typeof bundle !== "object") throw new Error("No bundle");
+    const { library, variants, site } = bundle;
+    if (!library || !Array.isArray(library.entries))
+      throw new Error("The bundle needs a library with an entries list");
+    if (!Array.isArray(variants))
+      throw new Error("The bundle needs a variants list");
+    // Validate everything before writing anything.
+    const clean = {
+      profile: cleanProfile(library.profile),
+      entries: library.entries.map(cleanEntry),
+    };
+    const ids = new Set();
+    for (const entry of clean.entries) {
+      if (ids.has(entry.id))
+        throw new Error(`Duplicate entry id "${entry.id}"`);
+      ids.add(entry.id);
+    }
+    checkEngagements(clean);
+    for (const variant of variants) {
+      if (!variant || typeof variant !== "object")
+        throw new Error("Bad variant");
+      checkId(variant.id, "variant id");
+      resolveVariant(clean, variant);
+    }
+    await store.writeLibrary(clean);
+    for (const existing of await store.listVariants()) {
+      if (!variants.some((v) => v.id === existing.id))
+        await store.deleteVariant(existing.id);
+    }
+    for (const variant of variants) await store.writeVariant(variant);
+    // Republish the same variants the old site showed, else the defaults.
+    const wanted = ["styled", "ats"]
+      .map((l) => site && site.published && site.published[l])
+      .filter(Boolean)
+      .map((cv) => cv.variant);
+    const publishIds = (wanted.length ? wanted : SITE_DEFAULTS).filter((id) =>
+      variants.some((v) => v.id === id)
+    );
+    if (publishIds.length) await publish(store, publishIds);
+    else await publishSiteData(store);
+    return { entries: clean.entries.length, variants: variants.length };
+  }
+
+  return async function handle(req, res) {
+    const send = (status, data) => {
+      res.statusCode = status;
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(JSON.stringify(data));
+    };
+    try {
+      if (authorize) {
+        const denied = await authorize(req);
+        if (denied) return send(denied.status, { error: denied.error });
+      }
+      let pathname = new URL(req.url, "http://localhost").pathname;
+      if (prefix && pathname.startsWith(prefix))
+        pathname = pathname.slice(prefix.length);
+      const [resource, id] = pathname.split("/").filter(Boolean);
+      const route = `${req.method} ${resource}${id ? "/:id" : ""}`;
+      switch (route) {
+        case "GET state":
+          return send(200, await state());
+        case "GET variants/:id":
+          return send(200, await store.readVariant(checkId(id)));
+        case "PUT variants/:id": {
+          const variant = await readBody(req);
+          if (variant.id !== checkId(id))
+            throw new Error("Variant id does not match URL");
+          await validateVariant(variant);
+          await store.writeVariant(variant);
+          return send(200, { ok: true });
+        }
+        case "POST preview":
+          return send(200, {
+            pages: await validateVariant(await readBody(req)),
+          });
+        case "POST publish/:id":
+          return send(200, await publish(store, checkId(id)));
+        case "POST timeline":
+          return send(200, await publishSiteData(store));
+        case "PUT profile":
+          return send(200, { profile: await saveProfile(await readBody(req)) });
+        case "PUT entries/:id":
+          return send(200, { entry: await saveEntry(id, await readBody(req)) });
+        case "DELETE entries/:id":
+          await deleteEntry(id);
+          return send(200, { ok: true });
+        case "GET export":
+          return send(200, await exportBundle());
+        case "POST import":
+          return send(200, await importBundle(await readBody(req)));
+        default:
+          return send(404, { error: "Not found" });
+      }
+    } catch (err) {
+      send(400, { error: err.message });
+    }
+  };
 }
 
-module.exports = function mountCvApi(app) {
-  app.use("/__cv", handle);
-};
-module.exports.handle = handle;
+module.exports = { createHandler, cleanEntry, cleanProfile, usage };

@@ -2,28 +2,31 @@
 import { computed } from "vue";
 import ProjectCard from "@/components/ProjectCard.vue";
 import { site } from "@/data/site";
-import { featuredProjects, otherProjects } from "@/data/projects";
-import type { PublishedTimeline, TimelineItem } from "@/cv/types";
-import timelineData from "../../cv/timeline.json";
+import { featured, other } from "@/data/projects";
+import { useContent } from "@/data/content";
+import type { TimelineItem } from "@/cv/types";
 
-const timeline = timelineData as PublishedTimeline;
+const { timeline, projects, ready } = useContent();
+const items = computed(() => timeline.value?.items ?? []);
+const featuredProjects = computed(() => featured(projects.value));
+const otherProjects = computed(() => other(projects.value));
 
 // "Currently": the most recent role. The timeline is newest first.
 const current = computed<TimelineItem | undefined>(() => {
-  const jobs = timeline.items.filter((i) => i.kind === "job");
+  const jobs = items.value.filter((i) => i.kind === "job");
   return jobs.find((j) => j.end === null) ?? jobs[0];
 });
 
 // The three newest things, skipping anything marked as not recent-worthy.
 const recent = computed(() =>
-  timeline.items.filter((i) => i.recent !== false).slice(0, 3)
+  items.value.filter((i) => i.recent !== false).slice(0, 3)
 );
 
-const byId = new Map(timeline.items.map((i) => [i.id, i]));
+const byId = computed(() => new Map(items.value.map((i) => [i.id, i])));
 // Engagements show the employer they were through.
 const orgOf = (item: TimelineItem) => {
   if (!item.parent) return item.org;
-  const parent = byId.get(item.parent);
+  const parent = byId.value.get(item.parent);
   return parent ? `via ${parent.org ?? parent.title}` : undefined;
 };
 
@@ -37,7 +40,7 @@ const KIND_LABELS: Record<string, string> = {
 </script>
 
 <template>
-  <div class="home">
+  <div class="home" :aria-busy="!ready">
     <section class="hero container">
       <div class="hero__text">
         <span class="eyebrow">Hi, I'm</span>

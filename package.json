@@ -6,12 +6,14 @@
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint",
-    "cv:publish": "node cv/publish.js",
-    "deploy": "npm run build && firebase deploy --only hosting",
-    "og:build": "node scripts/build-social-card.js"
+    "deploy": "npm run build && firebase deploy --only hosting,functions,firestore:rules",
+    "og:build": "node scripts/build-social-card.js",
+    "cv:bundle": "node scripts/cv-bundle.js",
+    "emulators": "firebase emulators:start --only functions,firestore"
   },
   "dependencies": {
     "core-js": "^3.8.3",
+    "firebase": "^11.10.0",
     "register-service-worker": "^1.7.2",
     "vue": "^3.2.13",
     "vue-class-component": "^8.0.0-0",

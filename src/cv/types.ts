@@ -1,4 +1,4 @@
-// Shape of one rendered CV page, as written to cv/published.json by cv/publish.js.
+// Shape of one rendered CV page, as published by functions/cv/publish.js.
 export interface Education {
   degree: string;
   uni: string;
@@ -33,7 +33,7 @@ export interface Project {
   tech: string;
 }
 
-// --- Projects on the site (src/data/projects.json, generated) ---
+// --- Projects on the site (published from the library) ---
 export type ProjectStatus = "live" | "open-source" | "in-progress" | "client";
 export const PROJECT_STATUSES: ProjectStatus[] = [
   "live",
@@ -104,14 +104,14 @@ export interface PublishedCV {
   pages: CVPage[];
 }
 
-// cv/published.json: one variant per layout. The site shows the styled one
+// The published CVs: one variant per layout. The site shows the styled one
 // and offers either when printing.
 export interface PublishedSite {
   styled: PublishedCV | null;
   ats: PublishedCV | null;
 }
 
-// One checkpoint on the public timeline (cv/timeline.json).
+// One checkpoint on the public timeline.
 export interface TimelineItem {
   id: string;
   kind: string;
@@ -133,7 +133,7 @@ export interface PublishedTimeline {
   items: TimelineItem[];
 }
 
-// --- Library & variants (cv/library.json, cv/variants/*.json) ---
+// --- Library & variants (Firestore: cv/library, cvVariants/{id}) ---
 export interface Profile {
   name: string;
   location?: string;

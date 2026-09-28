@@ -1,6 +1,8 @@
+import { nextTick } from "vue";
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import HomeView from "../views/HomeView.vue";
 import { pageMeta, site } from "@/data/site";
+import { loadContent } from "@/data/content";
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -25,14 +27,14 @@ const routes: Array<RouteRecordRaw> = [
   { path: "/home", redirect: "/" },
 ];
 
-// The CV dashboard only exists in dev; it needs the local API in cv/devApi.js.
-if (process.env.NODE_ENV === "development") {
-  routes.push({
-    path: "/admin",
-    name: "admin",
-    component: () => import("../views/AdminView.vue"),
-  });
-}
+// Vue CLI only (Nuxt: a page with ssr: false). The CV dashboard: its own
+// chunk, signed in through Firebase Auth, talking to /api/cv (functions/).
+routes.push({
+  path: "/admin",
+  name: "admin",
+  component: () => import("../views/AdminView.vue"),
+  meta: { noindex: true },
+});
 
 // Catch-all last, so it never shadows a real route.
 routes.push({
@@ -44,9 +46,14 @@ routes.push({
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes,
-  scrollBehavior(to, from, savedPosition) {
+  async scrollBehavior(to, from, savedPosition) {
     if (savedPosition) return savedPosition;
-    if (to.hash) return { el: to.hash, behavior: "smooth" };
+    if (to.hash) {
+      // The anchor may be inside content that is still loading.
+      await loadContent();
+      await nextTick();
+      return { el: to.hash, behavior: "smooth" };
+    }
     return { top: 0 };
   },
 });

@@ -8,6 +8,8 @@ import {
   watch,
 } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
+import { api, ApiError } from "@/cv/api";
+import { useAuth } from "@/cv/useAuth";
 import { sortRefsByDate } from "@/cv/order";
 import { normalizeRef, refId } from "@/cv/refs";
 import CvAtsDocument from "@/components/CvAtsDocument.vue";
@@ -60,16 +62,10 @@ const SECTION_LABELS: Record<SectionName, string> = {
   projects: "Projects",
 };
 
-async function api<T>(path: string, method = "GET", body?: unknown) {
-  const res = await fetch(`/__cv/${path}`, {
-    method,
-    headers: { "Content-Type": "application/json", "X-CV-Admin": "1" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data as T;
-}
+// Sign-in. The API answers 401/403 for anyone but the allow-listed account,
+// which puts the sign-in card back with the reason.
+const { user, checked: authChecked, email, signIn, signOut } = useAuth();
+const denied = ref("");
 
 const state = ref<State | null>(null);
 const variant = ref<Variant | null>(null);
@@ -82,9 +78,7 @@ const tab = ref<"library" | "layout">("library");
 const showPreview = ref(false); // hidden by default; it still renders offscreen
 // "light" is the plain dashboard; "site" borrows the site's colours and type.
 const THEME_KEY = "cv-admin-theme";
-const theme = ref<"light" | "site">(
-  localStorage.getItem(THEME_KEY) === "site" ? "site" : "light"
-);
+const theme = ref<"light" | "site">("light"); // read from storage on mount
 function toggleTheme() {
   theme.value = theme.value === "site" ? "light" : "site";
   localStorage.setItem(THEME_KEY, theme.value);
@@ -448,9 +442,8 @@ function reconcileVariant() {
   }
 }
 
-// cv/timeline.json and src/data/projects.json come straight from the
-// library. Saving an entry already regenerates them; this is for after
-// editing library.json by hand.
+// The timeline and project cards come straight from the library. Saving an
+// entry already regenerates them; this is for after an import or a repair.
 const publishSiteData = () =>
   run(async () => {
     const { count, projects } = await api<{ count: number; projects: number }>(
@@ -497,11 +490,55 @@ async function run(task: () => Promise<void>) {
   try {
     await task();
   } catch (err) {
-    error.value = (err as Error).message;
+    const status = err instanceof ApiError ? err.status : 0;
+    if (status === 401 || status === 403) denied.value = (err as Error).message;
+    else error.value = (err as Error).message;
   } finally {
     busy.value = false;
   }
 }
+
+// --- Backups ---
+// A bundle is the whole library plus every variant (and the site output, for
+// reference): what Export downloads and Import replaces everything with.
+const exportBundle = () =>
+  run(async () => {
+    const bundle = await api<{ exportedAt: string }>("export");
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cv-bundle-${bundle.exportedAt.slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    flash("Exported");
+  });
+
+const importInput = ref<HTMLInputElement | null>(null);
+const importBundle = () =>
+  run(async () => {
+    const file = importInput.value?.files?.[0];
+    if (!file) return;
+    const bundle = JSON.parse(await file.text());
+    if (importInput.value) importInput.value.value = "";
+    if (
+      !confirm(
+        `Replace the whole library and every variant with "${file.name}"? The site is republished from it straight away.`
+      )
+    )
+      return;
+    const { entries, variants } = await api<{
+      entries: number;
+      variants: number;
+    }>("import", "POST", bundle);
+    await loadState();
+    const id = variant.value?.id ?? state.value?.variants[0]?.id;
+    if (id) await loadVariant(id);
+    reconcileVariant();
+    schedulePreview();
+    flash(`Imported ${entries} entries and ${variants} variants`);
+  });
 
 async function loadState() {
   state.value = await api<State>("state");
@@ -640,15 +677,30 @@ const warnOnUnload = (event: BeforeUnloadEvent) => {
 
 onMounted(() => {
   window.addEventListener("beforeunload", warnOnUnload);
-  run(async () => {
-    await loadState();
-    const first =
-      state.value?.published.styled ??
-      state.value?.published.ats ??
-      state.value?.variants[0]?.id;
-    if (first) await loadVariant(first);
-  });
+  theme.value = localStorage.getItem(THEME_KEY) === "site" ? "site" : "light";
 });
+
+// Load once signed in; forget everything on sign-out.
+watch(
+  user,
+  (signedIn) => {
+    if (!signedIn) {
+      state.value = null;
+      variant.value = null;
+      return;
+    }
+    denied.value = "";
+    run(async () => {
+      await loadState();
+      const first =
+        state.value?.published.styled ??
+        state.value?.published.ats ??
+        state.value?.variants[0]?.id;
+      if (first) await loadVariant(first);
+    });
+  },
+  { immediate: true }
+);
 
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", warnOnUnload);
@@ -662,13 +714,26 @@ onBeforeRouteLeave(
 
 <template>
   <div class="cv-admin" :class="{ 'is-site': theme === 'site' }">
+    <div v-if="!authChecked" class="cv-admin__gate">Checking your sign-in…</div>
+    <div v-else-if="!user || denied" class="cv-admin__gate">
+      <h1 class="cv-admin__gate-title">CV dashboard</h1>
+      <p v-if="denied" class="text-danger">{{ denied }}</p>
+      <p v-else>Sign in with the Google account that owns this site.</p>
+      <div class="d-flex gap-2 justify-content-center">
+        <button class="a-btn a-btn--success" @click="signIn">
+          Sign in with Google
+        </button>
+        <button v-if="user" class="a-btn" @click="signOut">Sign out</button>
+      </div>
+    </div>
+    <div v-else-if="!state && !error" class="cv-admin__gate">Loading…</div>
     <div v-if="error" class="alert alert-danger no-print">{{ error }}</div>
 
     <div v-if="state && variant" class="cv-admin__grid">
       <section class="cv-admin__panel no-print">
         <!-- Variant settings -->
         <div class="cv-admin__variant">
-          <div class="d-flex gap-2 align-items-end">
+          <div class="d-flex gap-2 align-items-end flex-wrap">
             <label class="flex-grow-1">
               <span class="cv-admin__label">Variant</span>
               <select
@@ -697,7 +762,7 @@ onBeforeRouteLeave(
             </button>
             <button
               class="a-btn"
-              title="Regenerate cv/timeline.json and src/data/projects.json. Saving an entry already does this; use it after editing library.json by hand."
+              title="Regenerate the timeline and project cards on the site. Saving an entry already does this."
               :disabled="busy"
               @click="publishSiteData"
             >
@@ -705,11 +770,38 @@ onBeforeRouteLeave(
             </button>
             <button
               class="a-btn"
+              title="Download a backup of the library and every variant"
+              :disabled="busy"
+              @click="exportBundle"
+            >
+              Export
+            </button>
+            <label
+              class="a-btn"
+              :class="{ 'is-disabled': busy }"
+              title="Restore a backup, replacing everything"
+            >
+              Import
+              <input
+                ref="importInput"
+                type="file"
+                accept="application/json,.json"
+                class="d-none"
+                :disabled="busy"
+                @change="importBundle"
+              />
+            </label>
+            <button
+              class="a-btn"
               title="Switch between the plain dashboard and the site's own look"
               @click="toggleTheme"
             >
               {{ theme === "site" ? "Light theme" : "Site theme" }}
             </button>
+            <span class="small text-muted ms-auto text-nowrap">
+              {{ email }}
+              <button class="a-btn ms-1" @click="signOut">Sign out</button>
+            </span>
           </div>
           <div class="row g-2 mt-1">
             <label class="col-6">
@@ -1301,6 +1393,25 @@ onBeforeRouteLeave(
   max-width: 100%;
 }
 
+// The sign-in card (and the loading line) before the dashboard appears.
+.cv-admin__gate {
+  max-width: 28rem;
+  margin: 4rem auto;
+  padding: 1.5rem;
+  border: 1px solid var(--ad-line);
+  border-radius: 0.75rem;
+  background: var(--ad-bg);
+  text-align: center;
+  box-shadow: 0 1px 2px var(--ad-shadow);
+}
+
+.cv-admin__gate-title {
+  font-family: var(--ad-label-font);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
 .cv-admin__variant {
   border-bottom: 1px solid var(--ad-line);
   padding-bottom: 0.75rem;
@@ -1422,6 +1533,10 @@ onBeforeRouteLeave(
 }
 
 .a-btn {
+  &.is-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
   border: 1px solid var(--ad-line-strong);
   background: var(--ad-bg);
   color: var(--ad-text);

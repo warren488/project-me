@@ -56,6 +56,11 @@
     <link rel="icon" href="/logo-hand-drawn.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/img/icons/apple-touch-icon.png">
 
+    <!-- Vue CLI only (Nuxt: app.head). The site's content is one Firestore document; start
+         fetching it while the scripts download. Must match CONTENT_URL in src/data/content.ts. -->
+    <link rel="preconnect" href="https://firestore.googleapis.com">
+    <link rel="preload" as="fetch" crossorigin="anonymous" href="https://firestore.googleapis.com/v1/projects/radiant-inferno-8721/databases/(default)/documents/site/content?key=FIREBASE_API_KEY">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">

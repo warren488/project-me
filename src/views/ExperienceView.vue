@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import CvDocument from "@/components/CvDocument.vue";
 import CvAtsDocument from "@/components/CvAtsDocument.vue";
-import { CvLayout, PublishedSite } from "@/cv/types";
-import published from "../../cv/published.json";
+import { CvLayout } from "@/cv/types";
+import { useContent } from "@/data/content";
 
 // The site shows the rich CV. Printing offers a choice: the rich layout, or
 // the plain ATS one that applicant tracking systems parse cleanly.
-const site = published as PublishedSite;
-const rich = site.styled;
-const ats = site.ats;
+const { published, ready, error } = useContent();
+const rich = computed(() => published.value?.styled ?? null);
+const ats = computed(() => published.value?.ats ?? null);
 
 const chooser = ref<HTMLDialogElement | null>(null);
 // Which layout is being printed. The ATS document only mounts for its print.
@@ -85,6 +85,9 @@ onBeforeUnmount(() => window.removeEventListener("afterprint", afterPrint));
       </div>
     </dialog>
 
+    <p v-if="!ready" class="cv-loading container" aria-busy="true">
+      {{ error || "Loading the CV…" }}
+    </p>
     <!-- The rich CV is always on screen; hidden only while the ATS one prints. -->
     <div
       v-if="rich"
@@ -115,6 +118,13 @@ onBeforeUnmount(() => window.removeEventListener("afterprint", afterPrint));
 
 .cv-toolbar__hint {
   font-size: 0.85rem;
+  color: var(--muted);
+}
+
+// Holds the page height while the content arrives (first visit only).
+.cv-loading {
+  min-height: 60vh;
+  padding-top: 2rem;
   color: var(--muted);
 }
 

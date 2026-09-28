@@ -21,3 +21,11 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase
+functions/node_modules
+functions/.env.local
+firebase-debug.log
+.firebase/
+# Content backups exported from the admin
+cv-bundle*.json
