@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import { computed, PropType } from "vue";
 import type { Project } from "@/data/projects";
+import { PROJECT_STATUS_LABELS } from "@/cv/types";
 
 const props = defineProps({
   project: { type: Object as PropType<Project>, required: true },
 });
 
-const STATUS_LABELS: Record<Project["status"], string> = {
-  live: "Live",
-  "open-source": "Open source",
-  "in-progress": "In progress",
-  client: "Client work",
-};
-
-const status = computed(() => STATUS_LABELS[props.project.status]);
+const status = computed(() => PROJECT_STATUS_LABELS[props.project.status]);
 </script>
 
 <template>

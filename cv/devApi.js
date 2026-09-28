@@ -8,12 +8,17 @@ const {
   publish,
   readPublished,
   publishTimeline,
+  publishProjects,
+  refId,
+  engagementPick,
   formatRange,
   SECTION_KINDS,
   SIDEBAR_SECTIONS,
   TIMELINE_DEFAULT_KINDS,
   KINDS,
   ENGAGEMENT_KIND,
+  PROJECT_STATUSES,
+  PROJECT_HOMES,
 } = require("./publish");
 
 const CV_DIR = __dirname;
@@ -21,6 +26,14 @@ const LIBRARY_FILE = path.join(CV_DIR, "library.json");
 const VARIANTS_DIR = path.join(CV_DIR, "variants");
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
+const URL = /^https?:\/\/\S+$/;
+
+// Everything the site can show about an entry is written by publish.js; the
+// dev API only decides what is stored. Engagements of a job.
+const engagementsOf = (library, jobId) =>
+  library.entries.filter(
+    (e) => e.kind === ENGAGEMENT_KIND && e.parent === jobId
+  );
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 // Written through prettier so the files match what lint-staged would produce.
@@ -66,18 +79,33 @@ function readBody(req) {
 function usage(library, variants) {
   const byId = new Map(library.entries.map((e) => [e.id, e]));
   const map = {};
+  const record = (variantId, entry, bulletIds) => {
+    const use =
+      map[entry.id] || (map[entry.id] = { variants: [], bullets: {} });
+    if (!use.variants.includes(variantId)) use.variants.push(variantId);
+    const ids = bulletIds || (entry.bullets || []).map((b) => b.id);
+    for (const b of ids) {
+      (use.bullets[b] || (use.bullets[b] = [])).push(variantId);
+    }
+  };
   for (const variant of variants) {
     eachRef(variant, (ref) => {
-      const id = typeof ref === "string" ? ref : ref.id;
-      const use = map[id] || (map[id] = { variants: [], bullets: {} });
-      use.variants.push(variant.id);
-      const entry = byId.get(id);
-      const bullets =
-        typeof ref !== "string" && ref.bullets
-          ? ref.bullets
-          : ((entry && entry.bullets) || []).map((b) => b.id);
-      for (const b of bullets) {
-        (use.bullets[b] || (use.bullets[b] = [])).push(variant.id);
+      const id = refId(ref);
+      const entry = byId.get(id) || { id };
+      record(variant.id, entry, typeof ref !== "string" ? ref.bullets : null);
+      // Engagements ride along with their job: shown, rolled up, or at least
+      // configured in the ref.
+      if (entry.kind !== "job") return;
+      const picks =
+        typeof ref !== "string" && ref.engagements
+          ? typeof ref.engagements === "object"
+            ? ref.engagements
+            : {}
+          : {};
+      for (const eng of engagementsOf(library, id)) {
+        const pick = engagementPick(ref, eng.id);
+        if (pick.show || (pick.bullets && pick.bullets.length) || picks[eng.id])
+          record(variant.id, eng, pick.bullets);
       }
     });
   }
@@ -168,16 +196,19 @@ function cleanEntry(input) {
   }
   const details = optionalString(input, "details");
   if (details) entry.details = details;
-  const tech = optionalString(input, "tech");
-  if (tech) entry.tech = tech;
-  // Only stored when it differs from the default for the kind.
+  if (input.kind === "project") cleanProject(input, entry);
+  // Surfaces. Only stored when they differ from the default for the kind.
   if (
     typeof input.timeline === "boolean" &&
     input.timeline !== TIMELINE_DEFAULT_KINDS.includes(input.kind)
   ) {
     entry.timeline = input.timeline;
   }
+  if (entry.start && input.recent === false) entry.recent = false;
   entry.tags = tagList(input.tags, `"${id}"`);
+  // Private scratch notes: kept in the library, never published.
+  const notes = optionalString(input, "notes");
+  if (notes) entry.notes = notes;
 
   if (input.bullets !== undefined && input.bullets !== null) {
     if (!Array.isArray(input.bullets))
@@ -190,38 +221,105 @@ function cleanEntry(input) {
       seen.add(bulletId);
       const text = optionalString(b, "text");
       if (!text) throw new Error(`Bullet "${bulletId}" has no text`);
-      return {
+      const bullet = {
         id: bulletId,
         text,
         tags: tagList(b.tags, `bullet "${bulletId}"`),
       };
+      if (b.timeline === false) bullet.timeline = false;
+      return bullet;
     });
     if (!entry.bullets.length) delete entry.bullets;
   }
   return entry;
 }
 
+// The site's project card fields. `tech` is a list (a legacy string is split
+// on bullets or commas). Anything shown on the home page needs the full card.
+function cleanProject(input, entry) {
+  let tech = input.tech;
+  if (typeof tech === "string") tech = tech.split(/\s*[•|,]\s*/);
+  if (tech !== undefined && tech !== null) {
+    if (!Array.isArray(tech) || tech.some((t) => typeof t !== "string"))
+      throw new Error("Tech must be a list");
+    tech = [...new Set(tech.map((t) => t.trim()).filter(Boolean))];
+    if (tech.length) entry.tech = tech;
+  }
+  const tagline = optionalString(input, "tagline");
+  if (tagline) entry.tagline = tagline;
+  const description = optionalString(input, "description");
+  if (description) entry.description = description;
+  if (input.year !== undefined && input.year !== null && input.year !== "") {
+    const year = Number(input.year);
+    if (!Number.isInteger(year) || year < 1990 || year > 2100)
+      throw new Error("Year must be a four-digit year");
+    entry.year = year;
+  }
+  const status = optionalString(input, "status");
+  if (status) {
+    if (!PROJECT_STATUSES.includes(status))
+      throw new Error(`Unknown status "${status}"`);
+    entry.status = status;
+  }
+  if (input.links && typeof input.links === "object") {
+    const links = {};
+    for (const key of ["live", "source"]) {
+      const url = optionalString(input.links, key);
+      if (!url) continue;
+      if (!URL.test(url)) throw new Error(`The ${key} link must be a URL`);
+      links[key] = url;
+    }
+    if (Object.keys(links).length) entry.links = links;
+  }
+  const home = optionalString(input, "home") || "hidden";
+  if (!PROJECT_HOMES.includes(home))
+    throw new Error(`Unknown home placement "${home}"`);
+  if (home !== "hidden") {
+    for (const field of ["tagline", "description", "year", "status"]) {
+      if (entry[field] === undefined)
+        throw new Error(
+          `A project shown on the home page needs a ${field} (or set it to hidden)`
+        );
+    }
+    entry.home = home;
+  }
+}
+
 // Refuse changes that would break a saved variant, naming the variant so the
 // user can fix it there first.
 function checkEntryStillFits(entry, variants) {
+  const have = new Set((entry.bullets || []).map((b) => b.id));
+  const checkBullets = (variant, ids) => {
+    const missing = (ids || []).filter((b) => !have.has(b));
+    if (missing.length) {
+      throw new Error(
+        `Variant "${variant.id}" uses bullet "${missing[0]}" of "${entry.id}". Untick it there before removing it.`
+      );
+    }
+  };
   for (const variant of variants) {
     eachRef(variant, (ref, section) => {
-      const id = typeof ref === "string" ? ref : ref.id;
+      const id = refId(ref);
+      // An engagement configured under a job in a variant must stay there.
+      const picks =
+        typeof ref !== "string" && typeof ref.engagements === "object"
+          ? ref.engagements
+          : null;
+      if (picks && picks[entry.id]) {
+        if (entry.kind !== ENGAGEMENT_KIND || entry.parent !== id) {
+          throw new Error(
+            `Variant "${variant.id}" configures "${entry.id}" under "${id}". Untick it there first.`
+          );
+        }
+        checkBullets(variant, picks[entry.id].bullets);
+      }
       if (id !== entry.id) return;
       if (SECTION_KINDS[section] !== entry.kind) {
         throw new Error(
           `Variant "${variant.id}" lists "${entry.id}" under ${section}, so it must stay a ${SECTION_KINDS[section]}. Remove it from that variant first.`
         );
       }
-      if (typeof ref !== "string" && ref.bullets) {
-        const have = new Set((entry.bullets || []).map((b) => b.id));
-        const missing = ref.bullets.filter((b) => !have.has(b));
-        if (missing.length) {
-          throw new Error(
-            `Variant "${variant.id}" uses bullet "${missing[0]}" of "${entry.id}". Untick it there before removing it.`
-          );
-        }
-      }
+      if (typeof ref !== "string") checkBullets(variant, ref.bullets);
     });
   }
 }
@@ -241,7 +339,7 @@ function saveProfile(input) {
   const library = readJson(LIBRARY_FILE);
   library.profile = profile;
   writeJson(LIBRARY_FILE, library);
-  publishTimeline();
+  publishSiteData();
   return profile;
 }
 
@@ -263,9 +361,17 @@ function saveEntry(id, input) {
   if (index === -1) library.entries.push(entry);
   else library.entries[index] = entry;
   writeJson(LIBRARY_FILE, library);
-  // The timeline needs no selection step, so keep it in sync automatically.
-  publishTimeline();
+  // The timeline and project cards need no selection step, so keep them in
+  // sync automatically.
+  publishSiteData();
   return entry;
+}
+
+// Everything on the site that comes straight from the library.
+function publishSiteData() {
+  const timeline = publishTimeline();
+  const projects = publishProjects();
+  return { count: timeline.items.length, projects: projects.length };
 }
 
 function deleteEntry(id) {
@@ -282,15 +388,7 @@ function deleteEntry(id) {
         .map((e) => e.id)
         .join(", ")}). Move or delete those first.`
     );
-  const users = readVariants()
-    .filter((v) => {
-      let used = false;
-      eachRef(v, (ref) => {
-        if ((typeof ref === "string" ? ref : ref.id) === id) used = true;
-      });
-      return used;
-    })
-    .map((v) => v.id);
+  const users = (usage(library, readVariants())[id] || {}).variants || [];
   if (users.length) {
     throw new Error(
       `"${id}" is used by variant${users.length > 1 ? "s" : ""} ${users
@@ -300,7 +398,7 @@ function deleteEntry(id) {
   }
   library.entries.splice(index, 1);
   writeJson(LIBRARY_FILE, library);
-  publishTimeline();
+  publishSiteData();
 }
 
 // The request handler, mounted under /__cv. Exposed on its own so the dev
@@ -337,7 +435,7 @@ async function handle(req, res) {
         variantPath(id); // validates the id
         return send(200, publish(id));
       case "POST timeline":
-        return send(200, { count: publishTimeline().items.length });
+        return send(200, publishSiteData());
       case "PUT profile":
         return send(200, { profile: saveProfile(await readBody(req)) });
       case "PUT entries/:id":

@@ -1,7 +1,8 @@
-// Resolves a CV variant against the library and writes cv/published.json,
-// which is the only CV data the public site imports.
+// Resolves CV variants against the library and writes cv/published.json,
+// cv/timeline.json and src/data/projects.json: the only CV data the public
+// site imports.
 //
-// Usage: npm run cv:publish [variantId]   (defaults to "full")
+// Usage: npm run cv:publish [variantIds...]   (defaults to full and ats)
 const fs = require("fs");
 const path = require("path");
 
@@ -67,6 +68,10 @@ const SIDEBAR_SECTIONS = [
 ];
 
 // "2021-09" -> 24261; a bare year counts as January of that year.
+// Tech is stored as a list; the CV and timeline print it as one line.
+const joinTech = (tech) =>
+  Array.isArray(tech) ? tech.join(" • ") : tech || undefined;
+
 const monthIndex = (date) => {
   const [y, m] = date.split("-").map(Number);
   return y * 12 + ((m || 1) - 1);
@@ -98,6 +103,38 @@ function sortRefsByDate(refs, byId) {
     .map((x) => x.ref);
   let n = 0;
   return refs.map((r) => (isBreak(r) ? r : sorted[n++]));
+}
+
+const refId = (ref) => (typeof ref === "string" ? ref : ref.id);
+
+// How a job ref treats one of its engagements. A ref's `engagements` is
+// absent/true (all of them, all bullets), false (none), or a map of
+// deviations keyed by engagement id: { show?: boolean, bullets?: string[] }.
+// An engagement with show: false and a bullet list is hidden as a block, and
+// those bullets print under the job's own bullets instead ("rolled up").
+// Returns { show, bullets } where bullets undefined means "all of them".
+function engagementPick(ref, engagementId, where) {
+  const setting = typeof ref === "string" ? undefined : ref.engagements;
+  if (setting === undefined || setting === true) return { show: true };
+  if (setting === false) return { show: false, bullets: [] };
+  if (typeof setting !== "object" || Array.isArray(setting)) {
+    throw new Error(
+      `${where || "ref"}: "engagements" must be true, false or a map`
+    );
+  }
+  const pick = setting[engagementId];
+  if (pick === undefined) return { show: true };
+  if (!pick || typeof pick !== "object") {
+    throw new Error(`${where || "ref"}: bad engagement pick "${engagementId}"`);
+  }
+  if (pick.show !== undefined && typeof pick.show !== "boolean") {
+    throw new Error(`${where || "ref"}: "show" must be a boolean`);
+  }
+  if (pick.bullets !== undefined && !Array.isArray(pick.bullets)) {
+    throw new Error(`${where || "ref"}: "bullets" must be a list`);
+  }
+  const show = pick.show !== false;
+  return { show, bullets: pick.bullets || (show ? undefined : []) };
 }
 
 // Calls fn(ref, sectionName) for every entry reference in a variant.
@@ -139,12 +176,12 @@ function resolveVariant(library, variant) {
     return { entry, ref };
   };
 
-  // A ref is either "entry-id" (all bullets) or { id, bullets: [bulletIds] }.
-  const pickBullets = (entry, ref) => {
+  // The texts of the listed bullet ids, in that order; all of them if none
+  // are listed.
+  const pickBullets = (entry, ids) => {
     const bullets = entry.bullets || [];
-    if (typeof ref === "string" || !ref.bullets)
-      return bullets.map((b) => b.text);
-    return ref.bullets.map((bulletId) => {
+    if (!ids) return bullets.map((b) => b.text);
+    return ids.map((bulletId) => {
       const bullet = bullets.find((b) => b.id === bulletId);
       if (!bullet)
         throw new Error(
@@ -162,12 +199,7 @@ function resolveVariant(library, variant) {
         (a, b) =>
           (b.start ? monthIndex(b.start) : -1) -
           (a.start ? monthIndex(a.start) : -1)
-      )
-      .map((e) => ({
-        client: e.title,
-        dates: formatRange(e),
-        details: (e.bullets || []).map((b) => b.text),
-      }));
+      );
 
   // --- Cut the list into sheets ---
   // sheet = { order: [section...], items: { section: [{entry, ref}] }, continued: Set }
@@ -265,10 +297,34 @@ function resolveVariant(library, variant) {
             title: entry.title,
             company: entry.org,
             dates: formatRange(entry),
-            details: pickBullets(entry, ref),
+            details: pickBullets(
+              entry,
+              typeof ref === "string" ? undefined : ref.bullets
+            ),
           };
-          const wanted = typeof ref === "string" || ref.engagements !== false;
-          const engagements = wanted ? engagementsOf(entry) : [];
+          const own = engagementsOf(entry);
+          const picks = typeof ref === "string" ? undefined : ref.engagements;
+          if (picks && typeof picks === "object") {
+            for (const key of Object.keys(picks)) {
+              if (!own.some((e) => e.id === key))
+                throw new Error(
+                  `${where}: "${key}" is not an engagement of "${entry.id}"`
+                );
+            }
+          }
+          const engagements = [];
+          for (const eng of own) {
+            const pick = engagementPick(ref, eng.id, where);
+            if (pick.show) {
+              engagements.push({
+                client: eng.title,
+                dates: formatRange(eng),
+                details: pickBullets(eng, pick.bullets),
+              });
+            } else if (pick.bullets && pick.bullets.length) {
+              job.details.push(...pickBullets(eng, pick.bullets));
+            }
+          }
           if (engagements.length) job.engagements = engagements;
           return job;
         });
@@ -280,8 +336,8 @@ function resolveVariant(library, variant) {
       } else if (section === "projects") {
         out.projects = items(section).map(({ entry }) => ({
           title: entry.title,
-          desc: entry.details,
-          tech: entry.tech,
+          desc: entry.details || entry.tagline,
+          tech: joinTech(entry.tech),
         }));
       }
     }
@@ -327,8 +383,13 @@ function resolveTimeline(library) {
       if (entry.org) item.org = entry.org;
       if (entry.parent) item.parent = entry.parent;
       if (entry.details) item.details = entry.details;
-      if (entry.tech) item.tech = entry.tech;
-      if (entry.bullets) item.bullets = entry.bullets.map((b) => b.text);
+      if (entry.tech && entry.tech.length) item.tech = joinTech(entry.tech);
+      if (entry.bullets) {
+        item.bullets = entry.bullets
+          .filter((b) => b.timeline !== false)
+          .map((b) => b.text);
+      }
+      if (entry.recent === false) item.recent = false;
       return item;
     });
 }
@@ -345,6 +406,50 @@ function publishTimeline() {
     JSON.stringify(timeline, null, 2) + "\n"
   );
   return timeline;
+}
+
+// --- Projects on the site -------------------------------------------------
+// The home page's project cards come from the library too. Hidden projects
+// (and the private notes on any entry) never leave the library.
+const PROJECT_STATUSES = ["live", "open-source", "in-progress", "client"];
+const PROJECT_HOMES = ["featured", "more", "hidden"];
+const PROJECTS_FILE = path.join(CV_DIR, "..", "src", "data", "projects.json");
+
+function resolveProjects(library) {
+  return library.entries
+    .filter((e) => e.kind === "project" && PROJECT_HOMES.includes(e.home))
+    .filter((e) => e.home !== "hidden")
+    .map((e) => {
+      for (const field of ["tagline", "description", "year", "status"]) {
+        if (e[field] === undefined || e[field] === "")
+          throw new Error(
+            `project "${e.id}" is on the site but has no ${field}`
+          );
+      }
+      return {
+        id: e.id,
+        title: e.title,
+        tagline: e.tagline,
+        description: e.description,
+        tech: e.tech || [],
+        year: e.year,
+        status: e.status,
+        links: {
+          live: (e.links && e.links.live) || null,
+          source: (e.links && e.links.source) || null,
+        },
+        tags: e.tags || [],
+        home: e.home,
+      };
+    })
+    .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+}
+
+function publishProjects() {
+  const library = readJson(path.join(CV_DIR, "library.json"));
+  const projects = resolveProjects(library);
+  fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2) + "\n");
+  return projects;
 }
 
 // Every engagement must point at a job that exists.
@@ -397,6 +502,7 @@ function publish(variantIds = SITE_DEFAULTS) {
   }
   fs.writeFileSync(PUBLISHED_FILE, JSON.stringify(site, null, 2) + "\n");
   publishTimeline();
+  publishProjects();
   return site;
 }
 
@@ -404,6 +510,12 @@ module.exports = {
   resolveVariant,
   eachRef,
   isBreak,
+  refId,
+  engagementPick,
+  resolveProjects,
+  publishProjects,
+  PROJECT_STATUSES,
+  PROJECT_HOMES,
   SIDEBAR_SECTIONS,
   resolveTimeline,
   publish,
@@ -426,7 +538,7 @@ if (require.main === module) {
     for (const [layout, cv] of Object.entries(site)) {
       if (cv) console.log(`Published "${cv.variant}" as the ${layout} CV`);
     }
-    console.log("Published cv/timeline.json");
+    console.log("Published cv/timeline.json and src/data/projects.json");
   } catch (err) {
     console.error(err.message);
     process.exit(1);

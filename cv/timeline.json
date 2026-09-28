@@ -37,8 +37,7 @@
       "tags": [
         "client"
       ],
-      "parent": "job-rad",
-      "bullets": []
+      "parent": "job-rad"
     },
     {
       "id": "eng-bright-sparks",
@@ -89,7 +88,10 @@
         "devops"
       ],
       "parent": "job-rad",
-      "bullets": []
+      "bullets": [
+        "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>.",
+        "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing"
+      ]
     },
     {
       "id": "job-rad",

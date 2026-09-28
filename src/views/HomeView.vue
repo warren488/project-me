@@ -14,7 +14,10 @@ const current = computed<TimelineItem | undefined>(() => {
   return jobs.find((j) => j.end === null) ?? jobs[0];
 });
 
-const recent = computed(() => timeline.items.slice(0, 3));
+// The three newest things, skipping anything marked as not recent-worthy.
+const recent = computed(() =>
+  timeline.items.filter((i) => i.recent !== false).slice(0, 3)
+);
 
 const byId = new Map(timeline.items.map((i) => [i.id, i]));
 // Engagements show the employer they were through.

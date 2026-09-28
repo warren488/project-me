@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
-import { Bullet, EntryKind, EntryUsage, LibraryEntry } from "@/cv/types";
+import {
+  Bullet,
+  EntryKind,
+  EntryUsage,
+  LibraryEntry,
+  ProjectHome,
+  ProjectStatus,
+  PROJECT_HOMES,
+  PROJECT_STATUSES,
+  PROJECT_STATUS_LABELS,
+} from "@/cv/types";
 
 // Add / edit one library entry. The parent owns saving; this component only
 // turns the form into a clean LibraryEntry and emits it.
@@ -50,17 +60,18 @@ type Field =
   | "category"
   | "dates"
   | "details"
-  | "tech"
+  | "site"
   | "bullets";
 const FIELDS: Record<EntryKind, Partial<Record<Field, string>>> = {
   job: { org: "Company", dates: "Dates", bullets: "Bullets" },
   // Title is the client's name; the job it was through is the parent.
   engagement: { parent: "Under job", dates: "Dates", bullets: "Bullets" },
   education: { org: "Institution", dates: "Dates", details: "Details" },
+  // Projects carry the home page card (site) as well as the CV blurb.
   project: {
     dates: "Dates (optional)",
-    details: "Description",
-    tech: "Tech (e.g. Vue • Node)",
+    details: "CV blurb",
+    site: "Site card",
   },
   achievement: {
     org: "Awarded by",
@@ -83,8 +94,15 @@ interface BulletForm {
   id: string;
   text: string;
   tags: string;
+  timeline: boolean;
   customId: boolean;
 }
+
+const HOME_LABELS: Record<ProjectHome, string> = {
+  featured: "Featured",
+  more: "More projects",
+  hidden: "Hidden",
+};
 
 const isNew = computed(() => props.entry === null);
 const form = reactive({
@@ -99,8 +117,17 @@ const form = reactive({
   present: false,
   details: "",
   tech: "",
+  tagline: "",
+  description: "",
+  year: "",
+  status: "" as ProjectStatus | "",
+  live: "",
+  source: "",
+  home: "hidden" as ProjectHome,
   timeline: false,
+  recent: true,
   tags: "",
+  notes: "",
   bullets: [] as BulletForm[],
 });
 const customId = ref(false); // user typed their own id, stop auto-generating
@@ -120,15 +147,25 @@ watch(
       end: entry?.end ?? "",
       present: !!entry?.start && !entry?.end,
       details: entry?.details ?? "",
-      tech: entry?.tech ?? "",
+      tech: (entry?.tech ?? []).join(", "),
+      tagline: entry?.tagline ?? "",
+      description: entry?.description ?? "",
+      year: entry?.year ? String(entry.year) : "",
+      status: entry?.status ?? "",
+      live: entry?.links?.live ?? "",
+      source: entry?.links?.source ?? "",
+      home: entry?.home ?? "hidden",
       timeline:
         entry?.timeline ??
         props.timelineKinds.includes(entry?.kind ?? form.kind),
+      recent: entry?.recent !== false,
       tags: (entry?.tags ?? []).join(", "),
+      notes: entry?.notes ?? "",
       bullets: (entry?.bullets ?? []).map((b) => ({
         id: b.id,
         text: b.text,
         tags: b.tags.join(", "),
+        timeline: b.timeline !== false,
         customId: true,
       })),
     });
@@ -185,7 +222,13 @@ watch(
 const bulletUsedIn = (id: string) => props.usage?.bullets[id] ?? [];
 
 function addBullet() {
-  form.bullets.push({ id: "", text: "", tags: "", customId: false });
+  form.bullets.push({
+    id: "",
+    text: "",
+    tags: "",
+    timeline: true,
+    customId: false,
+  });
 }
 
 function removeBullet(index: number) {
@@ -216,6 +259,13 @@ const splitTags = (text: string) =>
     .map((t) => t.trim().toLowerCase())
     .filter(Boolean);
 
+// Tech keeps its case and spaces ("Firebase Functions"); commas separate.
+const splitList = (text: string) =>
+  text
+    .split(/\s*[,•]\s*/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
 function toEntry(): LibraryEntry {
   const entry: LibraryEntry = {
     id: form.id.trim(),
@@ -232,16 +282,34 @@ function toEntry(): LibraryEntry {
   }
   if (fields.value.details && form.details.trim())
     entry.details = form.details.trim();
-  if (fields.value.tech && form.tech.trim()) entry.tech = form.tech.trim();
-  if (entry.start) entry.timeline = form.timeline;
+  if (fields.value.site) {
+    const tech = splitList(form.tech);
+    if (tech.length) entry.tech = tech;
+    if (form.tagline.trim()) entry.tagline = form.tagline.trim();
+    if (form.description.trim()) entry.description = form.description.trim();
+    if (form.year.trim()) entry.year = Number(form.year.trim());
+    if (form.status) entry.status = form.status;
+    const links: NonNullable<LibraryEntry["links"]> = {};
+    if (form.live.trim()) links.live = form.live.trim();
+    if (form.source.trim()) links.source = form.source.trim();
+    if (Object.keys(links).length) entry.links = links;
+    entry.home = form.home; // the server drops the default ("hidden")
+  }
+  if (entry.start) {
+    entry.timeline = form.timeline;
+    if (!form.recent) entry.recent = false;
+  }
+  if (form.notes.trim()) entry.notes = form.notes.trim();
   if (fields.value.bullets && form.bullets.length) {
-    entry.bullets = form.bullets.map(
-      (b): Bullet => ({
+    entry.bullets = form.bullets.map((b): Bullet => {
+      const bullet: Bullet = {
         id: b.id.trim(),
         text: b.text.trim(),
         tags: splitTags(b.tags),
-      })
-    );
+      };
+      if (!b.timeline) bullet.timeline = false;
+      return bullet;
+    });
   }
   return entry;
 }
@@ -258,6 +326,12 @@ function submit() {
     return (message.value = "Skills need a category");
   if (entry.kind === "engagement" && !entry.parent)
     return (message.value = "An engagement needs a job to sit under");
+  if (entry.kind === "project" && entry.home !== "hidden") {
+    for (const field of ["tagline", "description", "year", "status"] as const) {
+      if (entry[field] === undefined)
+        return (message.value = `A project on the home page needs a ${field}, or set it to hidden`);
+    }
+  }
   if (
     props.entry &&
     props.entry.kind !== entry.kind &&
@@ -380,23 +454,61 @@ function remove() {
           />
           <span class="small">Present</span>
         </label>
-        <label
-          class="col-12 form-check d-flex align-items-center gap-1 ps-4 mb-0"
-        >
-          <input
-            v-model="form.timeline"
-            type="checkbox"
-            class="form-check-input"
-            :disabled="!form.start.trim()"
-          />
-          <span class="small">
-            Show on the public timeline
-            <span v-if="!form.start.trim()" class="text-muted"
-              >(needs a start date)</span
-            >
-          </span>
-        </label>
       </template>
+      <!-- Which public surfaces this entry appears on. The CV is chosen per
+           variant in the Layout tab instead. -->
+      <div v-if="fields.dates || fields.site" class="col-12">
+        <span class="entry-editor__label">Shown on</span>
+        <div class="entry-editor__chips">
+          <template v-if="fields.dates">
+            <button
+              type="button"
+              class="chip"
+              :class="{ 'is-on': form.timeline && form.start.trim() }"
+              :aria-pressed="form.timeline"
+              :disabled="!form.start.trim()"
+              title="The public timeline"
+              @click="form.timeline = !form.timeline"
+            >
+              Timeline
+            </button>
+            <button
+              type="button"
+              class="chip"
+              :class="{
+                'is-on': form.recent && form.timeline && form.start.trim(),
+              }"
+              :aria-pressed="form.recent"
+              :disabled="!form.start.trim() || !form.timeline"
+              title="Eligible for the home page's Recently strip (the three newest timeline items)"
+              @click="form.recent = !form.recent"
+            >
+              Home · Recently
+            </button>
+            <span v-if="!form.start.trim()" class="small text-muted">
+              needs a start date
+            </span>
+          </template>
+          <span
+            v-if="fields.dates && fields.site"
+            class="entry-editor__sep"
+          ></span>
+          <template v-if="fields.site">
+            <span class="small text-muted me-1">Home page:</span>
+            <button
+              v-for="h in PROJECT_HOMES"
+              :key="h"
+              type="button"
+              class="chip"
+              :class="{ 'is-on': form.home === h }"
+              :aria-pressed="form.home === h"
+              @click="form.home = h"
+            >
+              {{ HOME_LABELS[h] }}
+            </button>
+          </template>
+        </div>
+      </div>
       <label v-if="fields.details" class="col-12">
         <span class="entry-editor__label"
           >{{ fields.details }} (HTML allowed)</span
@@ -407,10 +519,74 @@ function remove() {
           class="form-control form-control-sm"
         ></textarea>
       </label>
-      <label v-if="fields.tech" class="col-12">
-        <span class="entry-editor__label">{{ fields.tech }}</span>
-        <input v-model="form.tech" class="form-control form-control-sm" />
-      </label>
+      <template v-if="fields.site">
+        <div class="col-12 entry-editor__group">
+          {{ fields.site }}
+          <span class="text-muted fw-normal text-lowercase">
+            · what the home page card shows
+          </span>
+        </div>
+        <label class="col-12">
+          <span class="entry-editor__label">Tagline</span>
+          <input
+            v-model="form.tagline"
+            class="form-control form-control-sm"
+            placeholder="One line under the title"
+          />
+        </label>
+        <label class="col-12">
+          <span class="entry-editor__label">Description</span>
+          <textarea
+            v-model="form.description"
+            rows="2"
+            class="form-control form-control-sm"
+          ></textarea>
+        </label>
+        <label class="col-12">
+          <span class="entry-editor__label">Tech (comma separated)</span>
+          <input
+            v-model="form.tech"
+            class="form-control form-control-sm"
+            placeholder="React, TypeScript, Firebase"
+          />
+        </label>
+        <label class="col-4">
+          <span class="entry-editor__label">Year</span>
+          <input
+            v-model="form.year"
+            class="form-control form-control-sm"
+            placeholder="YYYY"
+            pattern="\d{4}"
+          />
+        </label>
+        <label class="col-8">
+          <span class="entry-editor__label">Status</span>
+          <select v-model="form.status" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option v-for="st in PROJECT_STATUSES" :key="st" :value="st">
+              {{ PROJECT_STATUS_LABELS[st] }}
+            </option>
+          </select>
+        </label>
+        <label class="col-6">
+          <span class="entry-editor__label">Live link</span>
+          <input
+            v-model="form.live"
+            class="form-control form-control-sm"
+            type="url"
+            placeholder="https://"
+          />
+        </label>
+        <label class="col-6">
+          <span class="entry-editor__label">Source link</span>
+          <input
+            v-model="form.source"
+            class="form-control form-control-sm"
+            type="url"
+            placeholder="https://github.com/…"
+          />
+        </label>
+      </template>
       <label class="col-12">
         <span class="entry-editor__label">Tags (comma separated)</span>
         <input
@@ -421,6 +597,20 @@ function remove() {
         <datalist id="entry-editor-tags">
           <option v-for="t in knownTags" :key="t" :value="t" />
         </datalist>
+      </label>
+      <label class="col-12">
+        <span class="entry-editor__label">
+          Notes
+          <span class="text-muted fw-normal text-lowercase">
+            · private, never published
+          </span>
+        </span>
+        <textarea
+          v-model="form.notes"
+          rows="1"
+          class="form-control form-control-sm entry-editor__notes"
+          placeholder="Things to word properly later"
+        ></textarea>
       </label>
     </div>
 
@@ -459,6 +649,16 @@ function remove() {
             placeholder="tags"
             list="entry-editor-tags"
           />
+          <button
+            type="button"
+            class="chip chip--sm"
+            :class="{ 'is-on': bullet.timeline }"
+            :aria-pressed="bullet.timeline"
+            title="Show this bullet on the public timeline"
+            @click="bullet.timeline = !bullet.timeline"
+          >
+            timeline
+          </button>
           <button
             type="button"
             class="a-btn a-btn--icon"
@@ -531,24 +731,85 @@ function remove() {
 
 .entry-editor__label {
   display: block;
+  font-family: var(--ad-label-font);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #64748b;
+  color: var(--ad-muted);
 }
 
 .entry-editor__bullet {
   padding: 0.4rem 0.5rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--ad-line);
   border-radius: 0.375rem;
   margin-bottom: 0.35rem;
 }
 
+.entry-editor__group {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--ad-line);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ad-muted);
+}
+
+.entry-editor__notes {
+  background: var(--ad-notes-bg);
+  // Grows with the text up to three lines, then scrolls.
+  field-sizing: content;
+  min-height: calc(1.5em + 0.5rem);
+  max-height: calc(1.5em * 3 + 0.5rem + 2px);
+  overflow-y: auto;
+  resize: none;
+}
+
+.entry-editor__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+}
+
+// Forces the home-page group onto its own line.
+.entry-editor__sep {
+  flex-basis: 100%;
+  height: 0;
+}
+
+// Toggle chips: pressed = on.
+.chip {
+  border: 1px solid var(--ad-line-strong);
+  background: var(--ad-bg);
+  color: var(--ad-muted-2);
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  white-space: nowrap;
+
+  &.is-on {
+    background: var(--ad-on-bg);
+    border-color: var(--ad-on-line);
+    color: var(--ad-on-text);
+  }
+  &:disabled {
+    opacity: 0.45;
+  }
+  &--sm {
+    font-size: 0.7rem;
+    padding: 0 0.45rem;
+  }
+}
+
 .a-btn {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #1e293b;
+  border: 1px solid var(--ad-line-strong);
+  background: var(--ad-bg);
+  color: var(--ad-text);
   padding: 0.2rem 0.65rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
@@ -559,14 +820,14 @@ function remove() {
   }
 
   &--primary {
-    background: #2563eb;
-    border-color: #2563eb;
-    color: #fff;
+    background: var(--ad-accent);
+    border-color: var(--ad-accent);
+    color: var(--ad-bg);
   }
 
   &--danger {
-    border-color: #dc2626;
-    color: #dc2626;
+    border-color: var(--ad-danger);
+    color: var(--ad-danger);
   }
 
   &--icon {

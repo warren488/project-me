@@ -52,28 +52,39 @@
     {
       "id": "eng-ovo",
       "kind": "engagement",
-      "parent": "job-rad",
       "title": "OVO Energy",
+      "parent": "job-rad",
       "start": "2022-10",
       "end": "2025-11",
       "tags": ["client", "fullstack", "devops"],
-      "bullets": []
+      "bullets": [
+        {
+          "id": "ovo-orchestrated-containerized-microservices",
+          "text": "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>.",
+          "tags": []
+        },
+        {
+          "id": "ovo-engineered-cloud-infrastructure",
+          "text": "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing",
+          "tags": []
+        }
+      ]
     },
     {
       "id": "eng-direct-wines",
       "kind": "engagement",
-      "parent": "job-rad",
       "title": "Direct Wines",
+      "parent": "job-rad",
       "start": "2025-10",
       "end": "2025-12",
       "tags": ["client"],
-      "bullets": []
+      "notes": "Basically what we worked on was essentially a custom CMS build on top of contentful, where based on the limitations of the client and the fact that they had a very limited number of content types we needed to really find a way to allow the client to customise the look and feel of the website in very granular detail but at the same time doing it all within this small number of content types. That meant that the complexity of the models and codebase became a significant challenge both in terms of maintenance and also just achieveing the end result the client wanted.\nI had also been brought onto this project after a number of engineers were brought on and then removed after struggling to be able to really complete the project.\nOn the backend side I had to lead a major redesign of the microservices in order to make them compliant with the serverless architecture we had been using, after previous engineers had coded it as if it were a stateful server. \nI introduced things like async local storage in order to properly track requests coming in to the servers without having to manually pass things like trace tokens throughout the entire app.\nOn the frontend side I was instrumental in creating a POC that would see us move from vanilla react over to next JS while still being able to maintain the flexibility of the component system that was created in the CMS. \nIn this project there was a heavy focus on maximising the use of next JS' performance helpers like the new caching introduced in next 16 and other rendering tricks,"
     },
     {
       "id": "eng-jcdecaux",
       "kind": "engagement",
-      "parent": "job-rad",
       "title": "JCDecaux",
+      "parent": "job-rad",
       "start": "2026-01",
       "end": "2026-03",
       "tags": ["client"],
@@ -82,8 +93,8 @@
     {
       "id": "eng-cakebox",
       "kind": "engagement",
-      "parent": "job-rad",
       "title": "Cakebox",
+      "parent": "job-rad",
       "start": "2026-04",
       "end": "2026-09",
       "tags": ["client"],
@@ -92,8 +103,8 @@
     {
       "id": "eng-bright-sparks",
       "kind": "engagement",
-      "parent": "job-wsc",
       "title": "Bright Sparks Tutoring Agency",
+      "parent": "job-wsc",
       "start": "2025-02",
       "end": null,
       "tags": ["client", "fullstack", "devops"],
@@ -217,18 +228,43 @@
     {
       "id": "proj-chat-pwa",
       "kind": "project",
-      "title": "Real-time Chat PWA",
+      "title": "Web Chat",
       "details": "Engineered a PWA with real-time messaging, voice notes, and push notifications.",
-      "tech": "MongoDB • Socket.IO • Vue2",
-      "tags": ["personal", "fullstack"]
+      "tech": ["Vue", "Socket.IO", "MongoDB", "Firebase", "Service Workers"],
+      "tagline": "A chat PWA built to see how far the web could go",
+      "description": "Offline support with a service worker and IndexedDB, push notifications, voice notes, image sharing straight from the OS share sheet, friend requests, read receipts and typing indicators, and watching YouTube together with synced playback. Vue 2 on the front, Socket.IO and MongoDB behind it.",
+      "year": 2020,
+      "status": "live",
+      "links": {
+        "live": "https://webchat.scantlebury.io",
+        "source": "https://github.com/warren488/web-chat-app"
+      },
+      "home": "featured",
+      "tags": ["personal", "fullstack", "pwa", "realtime"]
     },
     {
       "id": "proj-dominoes",
       "kind": "project",
-      "title": "Dominoes Multiplayer PWA",
+      "title": "Noez",
       "details": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
-      "tech": "Firebase • React",
-      "tags": ["personal", "frontend"]
+      "tech": [
+        "React",
+        "TypeScript",
+        "Vite",
+        "Capacitor",
+        "Firebase Functions",
+        "Firestore"
+      ],
+      "tagline": "Multiplayer Caribbean dominoes, on the web and in your pocket",
+      "description": "Live sessions with friends, spectators on the rail, table votes, stats and ranks, and play-by-play replays of every finished game. One React codebase ships as a web app, a PWA and an Android app. All writes go through Cloud Functions, with a tested Firestore rules suite guarding the read side.",
+      "year": 2026,
+      "status": "live",
+      "links": {
+        "live": "https://noes-246.web.app",
+        "source": "https://github.com/warren488/noez"
+      },
+      "home": "featured",
+      "tags": ["personal", "frontend", "mobile", "realtime", "game"]
     },
     {
       "id": "int-hardware",
@@ -263,18 +299,8 @@
       "title": "CI/CD Pipelines",
       "tags": ["devops"]
     },
-    {
-      "id": "comp-tdd",
-      "kind": "competency",
-      "title": "TDD",
-      "tags": []
-    },
-    {
-      "id": "comp-jira",
-      "kind": "competency",
-      "title": "JIRA",
-      "tags": []
-    },
+    { "id": "comp-tdd", "kind": "competency", "title": "TDD", "tags": [] },
+    { "id": "comp-jira", "kind": "competency", "title": "JIRA", "tags": [] },
     {
       "id": "comp-microservices",
       "kind": "competency",
@@ -290,120 +316,120 @@
     {
       "id": "skill-typescript",
       "kind": "skill",
-      "category": "Frontend",
       "title": "TypeScript",
+      "category": "Frontend",
       "tags": ["frontend"]
     },
     {
       "id": "skill-javascript",
       "kind": "skill",
-      "category": "Frontend",
       "title": "JavaScript",
+      "category": "Frontend",
       "tags": ["frontend"]
     },
     {
       "id": "skill-react",
       "kind": "skill",
-      "category": "Frontend",
       "title": "React",
+      "category": "Frontend",
       "tags": ["frontend"]
     },
     {
       "id": "skill-nextjs",
       "kind": "skill",
-      "category": "Frontend",
       "title": "Next.js",
+      "category": "Frontend",
       "tags": ["frontend"]
     },
     {
       "id": "skill-vue",
       "kind": "skill",
-      "category": "Frontend",
       "title": "Vue.js",
+      "category": "Frontend",
       "tags": ["frontend"]
     },
     {
       "id": "skill-tailwind",
       "kind": "skill",
-      "category": "Frontend",
       "title": "Tailwind CSS",
+      "category": "Frontend",
       "tags": ["frontend"]
     },
     {
       "id": "skill-node",
       "kind": "skill",
-      "category": "Backend",
       "title": "Node.js",
+      "category": "Backend",
       "tags": ["backend"]
     },
     {
       "id": "skill-express",
       "kind": "skill",
-      "category": "Backend",
       "title": "Express",
+      "category": "Backend",
       "tags": ["backend"]
     },
     {
       "id": "skill-rest",
       "kind": "skill",
-      "category": "Backend",
       "title": "RESTful APIs",
+      "category": "Backend",
       "tags": ["backend"]
     },
     {
       "id": "skill-graphql",
       "kind": "skill",
-      "category": "Backend",
       "title": "GraphQL",
+      "category": "Backend",
       "tags": ["backend"]
     },
     {
       "id": "skill-gcp",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "GCP",
+      "category": "DevOps & Cloud",
       "tags": ["devops"]
     },
     {
       "id": "skill-lambda",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "AWS Lambda",
+      "category": "DevOps & Cloud",
       "tags": ["devops", "aws"]
     },
     {
       "id": "skill-kubernetes",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "Kubernetes",
+      "category": "DevOps & Cloud",
       "tags": ["devops"]
     },
     {
       "id": "skill-terraform",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "Terraform",
+      "category": "DevOps & Cloud",
       "tags": ["devops"]
     },
     {
       "id": "skill-gitops",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "GitOps",
+      "category": "DevOps & Cloud",
       "tags": ["devops"]
     },
     {
       "id": "skill-kafka",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "Kafka",
+      "category": "DevOps & Cloud",
       "tags": ["devops", "backend"]
     },
     {
       "id": "skill-sql",
       "kind": "skill",
-      "category": "DevOps & Cloud",
       "title": "SQL",
+      "category": "DevOps & Cloud",
       "tags": ["backend"]
     },
     {
@@ -420,8 +446,171 @@
       "kind": "project",
       "title": "Fitnese",
       "details": "Fitnese is an activity tracking app focused on detailed exercise metadata, injury risk tracking, rehabilitation benefits, and offline-first functionality.",
-      "tech": "capacitor vue PWA",
-      "tags": []
+      "tech": [
+        "React",
+        "TypeScript",
+        "Vite",
+        "Supabase",
+        "PostgreSQL",
+        "Capacitor",
+        "Workbox"
+      ],
+      "tagline": "Workout tracking that understands injuries and rehab",
+      "description": "An offline-first fitness PWA where exercises inherit from parents, target muscles hierarchically, and carry injury risk and rehabilitation metadata, so training can follow what your body actually needs. React 19 and Supabase, wrapped with Capacitor for Android.",
+      "year": 2025,
+      "status": "live",
+      "links": {
+        "live": "https://fitenese-2.web.app",
+        "source": "https://github.com/warren488/fitnese-2"
+      },
+      "home": "featured",
+      "tags": ["pwa", "offline-first", "health"]
+    },
+    {
+      "id": "proj-reo-bridge",
+      "kind": "project",
+      "title": "Reo Bridge",
+      "tech": ["Python", "FFmpeg", "MediaMTX", "Docker", "GitHub Actions"],
+      "tagline": "Battery cameras for Frigate NVR",
+      "description": "Frigate expects always-on RTSP streams. Battery cameras sleep and only upload short motion clips over FTP. This bridge watches for clips and plays them through one persistent RTSP stream, filling the gaps with idle frames so Frigate never disconnects. Python, FFmpeg and MediaMTX in a container, with CI and a small web UI for tuning.",
+      "year": 2026,
+      "status": "open-source",
+      "links": {
+        "source": "https://github.com/warren488/reolink-battery-to-frigate"
+      },
+      "home": "featured",
+      "tags": ["homelab", "video", "open-source"]
+    },
+    {
+      "id": "proj-budgit",
+      "kind": "project",
+      "title": "Budgit",
+      "tech": [
+        "Next.js",
+        "Firebase",
+        "Genkit",
+        "Gemini",
+        "FastAPI",
+        "PaddleOCR"
+      ],
+      "tagline": "Photograph a receipt, get a budget",
+      "description": "Snap a receipt and the line items, discounts, store and date are extracted and categorised for you. A Next.js app on Firebase with Genkit and Gemini for the understanding, backed by a self-hosted FastAPI and PaddleOCR service that pre-processes and reads the image so the model gets clean text.",
+      "year": 2026,
+      "status": "in-progress",
+      "links": { "source": "https://github.com/warren488/budgit-full" },
+      "home": "featured",
+      "tags": ["ai", "ocr", "fintech"]
+    },
+    {
+      "id": "proj-healthlog",
+      "kind": "project",
+      "title": "HealthLog",
+      "tech": ["Next.js", "React", "Supabase", "Tailwind CSS", "Serwist"],
+      "tagline": "One timeline for every condition you manage",
+      "description": "A multi-condition health logging PWA with consent-based sharing, so a doctor or caregiver sees only what you grant them. Next.js App Router with cookie-based Supabase auth, Serwist for offline, and a schema designed for scoped and revocable access.",
+      "year": 2026,
+      "status": "live",
+      "links": {
+        "live": "https://health-monitor-bay.vercel.app",
+        "source": "https://github.com/warren488/health-monitor"
+      },
+      "home": "featured",
+      "tags": ["pwa", "health", "privacy"]
+    },
+    {
+      "id": "proj-homelab-monitoring",
+      "kind": "project",
+      "title": "Homelab monitoring",
+      "tech": [
+        "Prometheus",
+        "Grafana",
+        "Alertmanager",
+        "Docker Compose",
+        "Proxmox",
+        "TrueNAS"
+      ],
+      "tagline": "Prometheus and Grafana for the rack at home",
+      "description": "A Docker Compose stack watching a Proxmox cluster and a TrueNAS box: node, SMART, cAdvisor, blackbox and Proxmox exporters into Prometheus, Grafana dashboards, and Alertmanager so I hear about a dying disk before it dies.",
+      "year": 2026,
+      "status": "in-progress",
+      "links": { "source": "https://github.com/warren488/monitoring" },
+      "home": "featured",
+      "tags": ["homelab", "observability"]
+    },
+    {
+      "id": "proj-project-me",
+      "kind": "project",
+      "title": "This site",
+      "tech": ["Vue 3", "TypeScript", "Firebase Hosting"],
+      "tagline": "A CV that publishes itself",
+      "description": "The CV on this site is built from a library of reusable entries and named variants, each picking sections, bullets and page breaks. A publish step resolves a variant to JSON, the same data feeds the timeline page, and a dev-only dashboard edits it all. Print styles cut it into A4 sheets, with a plain single-column variant for applicant tracking systems.",
+      "year": 2026,
+      "status": "live",
+      "links": {
+        "live": "https://warren.scantlebury.io",
+        "source": "https://github.com/warren488/project-me"
+      },
+      "home": "more",
+      "tags": ["meta"]
+    },
+    {
+      "id": "proj-bright-sparks",
+      "kind": "project",
+      "title": "Bright Sparks Tutoring",
+      "tech": [
+        "Next.js",
+        "React",
+        "Firebase",
+        "Cloud Functions",
+        "Cypress",
+        "GitHub Actions"
+      ],
+      "tagline": "Website and enrolment platform for a tutoring agency",
+      "description": "Client work through my consultancy: the public site plus a multi-step enrolment form, role-based admin dashboard and email notifications. Next.js and Firebase, with Cloud Functions, Cypress end-to-end tests, GitHub Actions deploys to Firebase App Hosting and a daily backup plan.",
+      "year": 2025,
+      "status": "client",
+      "links": { "source": "https://github.com/warren488/studio-creation" },
+      "home": "more",
+      "tags": ["client"]
+    },
+    {
+      "id": "proj-bsoe",
+      "kind": "project",
+      "title": "Barbados School of Education",
+      "tech": ["Vue 3", "TypeScript", "Vite", "Firebase Hosting"],
+      "tagline": "Official website for a school",
+      "description": "The public website for the Barbados School of Education, built with Vue 3 and Vite and hosted on Firebase.",
+      "year": 2022,
+      "status": "client",
+      "links": { "source": "https://github.com/warren488/bsoe" },
+      "home": "more",
+      "tags": ["client"]
+    },
+    {
+      "id": "proj-ebay-deal-finder",
+      "kind": "project",
+      "title": "eBay deal finder",
+      "tech": ["Next.js", "TypeScript", "Supabase", "pnpm workspaces"],
+      "tagline": "Scheduled marketplace searches with explainable ranking",
+      "description": "A self-hostable monorepo for scheduled marketplace searches, AI-assisted listing normalisation and ranking that shows its reasoning. Next.js 16, Supabase and a ports-and-adapters core so the marketplace and AI providers can be swapped.",
+      "year": 2026,
+      "status": "in-progress",
+      "links": { "source": "https://github.com/warren488/ebay-shenanigans" },
+      "home": "more",
+      "tags": ["ai"]
+    },
+    {
+      "id": "proj-comment-extractor",
+      "kind": "project",
+      "title": "Comment Extractor",
+      "tech": ["TypeScript", "VS Code API"],
+      "tagline": "A VS Code extension for keeping long comments out of the code",
+      "description": "Point a short reference in the code at a longer explanation stored in another file, and read it in place from the editor.",
+      "year": 2023,
+      "status": "in-progress",
+      "links": { "source": "https://github.com/warren488/comment-extractor" },
+      "home": "more",
+      "tags": ["tooling"]
     }
   ]
 }

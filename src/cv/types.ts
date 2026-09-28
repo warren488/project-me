@@ -33,6 +33,39 @@ export interface Project {
   tech: string;
 }
 
+// --- Projects on the site (src/data/projects.json, generated) ---
+export type ProjectStatus = "live" | "open-source" | "in-progress" | "client";
+export const PROJECT_STATUSES: ProjectStatus[] = [
+  "live",
+  "open-source",
+  "in-progress",
+  "client",
+];
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  live: "Live",
+  "open-source": "Open source",
+  "in-progress": "In progress",
+  client: "Client work",
+};
+
+// Where a project sits on the home page: the main grid, the collapsed "More
+// projects" list, or nowhere (the default).
+export type ProjectHome = "featured" | "more" | "hidden";
+export const PROJECT_HOMES: ProjectHome[] = ["featured", "more", "hidden"];
+
+export interface SiteProject {
+  id: string;
+  title: string;
+  tagline: string;
+  description: string;
+  tech: string[];
+  year: number;
+  status: ProjectStatus;
+  links: { live: string | null; source: string | null };
+  tags: string[];
+  home: Exclude<ProjectHome, "hidden">;
+}
+
 export interface Interest {
   name: string;
   desc: string;
@@ -90,8 +123,9 @@ export interface TimelineItem {
   details?: string;
   tech?: string;
   tags: string[];
-  bullets?: string[];
+  bullets?: string[]; // only the bullets marked for the timeline
   parent?: string; // engagements: the id of the job they sit under
+  recent?: boolean; // false = keep out of the home page's "Recently" strip
 }
 
 export interface PublishedTimeline {
@@ -122,6 +156,7 @@ export interface Bullet {
   id: string;
   text: string;
   tags: string[];
+  timeline?: boolean; // false = not shown on the public timeline (default true)
 }
 
 export interface LibraryEntry {
@@ -133,11 +168,20 @@ export interface LibraryEntry {
   parent?: string; // engagements only: the job id
   start?: string; // "YYYY" or "YYYY-MM"
   end?: string | null; // null = present
-  details?: string;
-  tech?: string;
+  details?: string; // projects: the CV blurb
+  tech?: string[]; // projects; joined with " • " for the CV and timeline
   timeline?: boolean; // override the per-kind default for the public timeline
+  recent?: boolean; // false = keep out of the home page's "Recently" strip
   tags: string[];
   bullets?: Bullet[];
+  notes?: string; // private scratch notes; never published anywhere
+  // Projects on the site (see SiteProject).
+  tagline?: string;
+  description?: string;
+  year?: number;
+  status?: ProjectStatus;
+  links?: { live?: string; source?: string };
+  home?: ProjectHome; // stored only when featured or more
   displayDates?: string; // added by the dev API, not stored
 }
 
@@ -158,11 +202,25 @@ export const SIDEBAR_SECTIONS: SectionName[] = [
   "interests",
 ];
 
-// "entry-id" = include every bullet; object form picks specific bullets.
-// `engagements: false` leaves a job's client engagements out.
+// How a job ref treats one of its client engagements. Absent from the map =
+// shown with all bullets. `bullets` is the print order. `show: false` hides
+// the engagement block; with a bullet list, those bullets are "rolled up"
+// and print under the job's own bullets instead.
+export interface EngagementPick {
+  show?: boolean;
+  bullets?: string[];
+}
+
+// "entry-id" = every bullet and every engagement. The object form picks the
+// job's own bullets (in print order) and, for engagements, either all
+// (true / absent), none (false) or a map of deviations by engagement id.
 export type VariantRef =
   | string
-  | { id: string; bullets?: string[]; engagements?: boolean };
+  | {
+      id: string;
+      bullets?: string[];
+      engagements?: boolean | Record<string, EngagementPick>;
+    };
 
 // A page break: between sections, or between refs of a main-column section.
 export interface PageBreak {
