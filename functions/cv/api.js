@@ -1,4 +1,4 @@
-// The API behind the /admin dashboard. createHandler() returns a plain
+// The API behind the CV dashboard. createHandler() returns a plain
 // (req, res) function: the Cloud Function in ../index.js mounts it with a
 // Firestore store and Firebase Auth; a script can mount it with a file store
 // and no auth. Everything the site can show is written by publish.js; this

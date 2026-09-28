@@ -29,8 +29,11 @@ const routes: Array<RouteRecordRaw> = [
 
 // Vue CLI only (Nuxt: a page with ssr: false). The CV dashboard: its own
 // chunk, signed in through Firebase Auth, talking to /api/cv (functions/).
+// The path is deliberately unguessable and not listed anywhere public
+// (robots.txt included); sign-in is the real guard, this just cuts noise.
+export const ADMIN_PATH = "/desk-shkqfe";
 routes.push({
-  path: "/admin",
+  path: ADMIN_PATH,
   name: "admin",
   component: () => import("../views/AdminView.vue"),
   meta: { noindex: true },

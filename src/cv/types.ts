@@ -255,7 +255,7 @@ export interface Variant {
 }
 
 // Which saved variants reference an entry, and each of its bullets. Built by
-// the dev API for the /admin dashboard.
+// the API for the CV dashboard.
 export interface EntryUsage {
   variants: string[];
   bullets: Record<string, string[]>;

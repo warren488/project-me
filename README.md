@@ -1,26 +1,31 @@
 # project-me
 
 ## Project setup
+
 ```
 npm install
 ```
 
 ### Compiles and hot-reloads for development
+
 ```
 npm run serve
 ```
 
 ### Compiles and minifies for production
+
 ```
 npm run build
 ```
 
 ### Lints and fixes files
+
 ```
 npm run lint
 ```
 
 ### Customize configuration
+
 See [Configuration Reference](https://cli.vuejs.org/config/).
 
 ## Content and the admin dashboard
@@ -28,7 +33,8 @@ See [Configuration Reference](https://cli.vuejs.org/config/).
 The CV, timeline and project cards live in Firestore (project
 `radiant-inferno-8721`), not in this repo. The public site fetches them as one
 document (`site/content`) at load time; `src/data/content.ts` is the only place
-that reads it. Edit them at `/admin`: sign in with one of the Google accounts in
+that reads it. Edit them at the dashboard route (`ADMIN_PATH` in
+`src/router/index.ts`, kept out of robots.txt on purpose): sign in with one of the Google accounts in
 `functions/.env`, change entries in the Library tab and what each CV variant
 prints in the Layout tab, then Save & publish. Every save republishes the
 timeline and project cards; Export downloads a backup bundle and Import
