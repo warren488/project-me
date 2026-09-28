@@ -507,8 +507,10 @@ const cont = (s: SectionName) =>
   letter-spacing: 0.5px;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
+/* Responsive. Screen only: Chrome sizes print media queries to the paper
+   minus its default margins (under 768px on A4), which would otherwise
+   stack the project cards and shrink the padding only when printing. */
+@media screen and (max-width: 768px) {
   .sidebar,
   .main-content {
     padding: var(--space-sm) var(--space-md);

@@ -602,7 +602,10 @@ const overflow = ref<{ page: number; mm: number }[]>([]);
 
 async function measureOverflow() {
   await nextTick();
-  const sheets = previewEl.value?.querySelectorAll<HTMLElement>(".cv-page");
+  // Only the printed sheets: the continuous on-screen copy is a .cv-page too.
+  const sheets = previewEl.value?.querySelectorAll<HTMLElement>(
+    ".cv-sheets .cv-page"
+  );
   if (!(paged.value || !showPreview.value) || !sheets?.length) {
     overflow.value = [];
     return;

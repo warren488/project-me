@@ -24,8 +24,7 @@
       "tags": [
         "client"
       ],
-      "parent": "job-rad",
-      "bullets": []
+      "parent": "job-rad"
     },
     {
       "id": "eng-direct-wines",

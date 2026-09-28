@@ -88,7 +88,7 @@
       "start": "2026-01",
       "end": "2026-03",
       "tags": ["client"],
-      "bullets": []
+      "notes": "Next JS app with a custom, purpose built CMS/admin dashboard that allowed updates to parts of the site while allowing employees to browse and analyse form submissions"
     },
     {
       "id": "eng-cakebox",
@@ -108,6 +108,7 @@
       "start": "2025-02",
       "end": null,
       "tags": ["client", "fullstack", "devops"],
+      "notes": "test",
       "bullets": [
         {
           "id": "bs-bright-sparks",

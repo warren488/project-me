@@ -125,7 +125,10 @@
               {
                 "client": "OVO Energy",
                 "dates": "Oct 2022 – Nov 2025",
-                "details": []
+                "details": [
+                  "Orchestrated containerized microservices on <strong>Kubernetes</strong>, integrating <strong>Kafka</strong> for event streaming and <strong>BigQuery</strong>.",
+                  "Engineered cloud infrastructure on <strong>GCP</strong> using <strong>Terraform</strong> and <strong>Helm</strong>, implementing"
+                ]
               }
             ]
           },
@@ -191,19 +194,19 @@
         ],
         "projects": [
           {
-            "title": "Real-time Chat PWA",
+            "title": "Web Chat",
             "desc": "Engineered a PWA with real-time messaging, voice notes, and push notifications.",
-            "tech": "MongoDB • Socket.IO • Vue2"
+            "tech": "Vue • Socket.IO • MongoDB • Firebase • Service Workers"
           },
           {
-            "title": "Dominoes Multiplayer PWA",
+            "title": "Noez",
             "desc": "Developed a multiplayer game with real-time state synchronization and live chat using Firestore.",
-            "tech": "Firebase • React"
+            "tech": "React • TypeScript • Vite • Capacitor • Firebase Functions • Firestore"
           },
           {
             "title": "Fitnese",
             "desc": "Fitnese is an activity tracking app focused on detailed exercise metadata, injury risk tracking, rehabilitation benefits, and offline-first functionality.",
-            "tech": "capacitor vue PWA"
+            "tech": "React • TypeScript • Vite • Supabase • PostgreSQL • Capacitor • Workbox"
           }
         ]
       }

@@ -85,7 +85,7 @@ const merged = computed(() => mergePages(props.pages));
   --sidebar-width: 280px;
 }
 
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
   .cv-screen .cv-page {
     grid-template-columns: 1fr;
   }
