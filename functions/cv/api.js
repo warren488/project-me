@@ -294,9 +294,14 @@ function cleanProfile(input) {
 
 // --- Everything that touches a store ---
 function createHandler({ store, authorize, prefix = "" }) {
+  // An empty store (nothing imported yet) is an empty library, not an error,
+  // so the dashboard can offer Import.
+  const readLibraryOrEmpty = () =>
+    store.readLibrary().catch(() => ({ profile: {}, entries: [] }));
+
   async function state() {
     const [library, variants, site] = await Promise.all([
-      store.readLibrary(),
+      readLibraryOrEmpty(),
       store.listVariants(),
       readPublished(store),
     ]);

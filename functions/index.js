@@ -31,9 +31,30 @@ async function authorize(req) {
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  const email = (user.email || "").toLowerCase();
-  if (!user.email_verified || !allowed.includes(email)) {
-    return { status: 403, error: `${user.email} can't edit this site` };
+  let email = (user.email || "").toLowerCase();
+  let verified = !!user.email_verified;
+  if (!email) {
+    // With "create multiple accounts per identity provider" switched on,
+    // Firebase keeps the address on the provider record only. Google
+    // accounts are verified by Google.
+    const record = await getAuth().getUser(user.uid);
+    const google = record.providerData.find(
+      (p) => p.providerId === "google.com" && p.email
+    );
+    if (google) {
+      email = google.email.toLowerCase();
+      verified = true;
+    }
+  }
+  if (!email) {
+    return {
+      status: 403,
+      error:
+        "Google didn't share an email address for that account (a brand account, perhaps). Sign out and pick the account that shows your email.",
+    };
+  }
+  if (!verified || !allowed.includes(email)) {
+    return { status: 403, error: `${email} can't edit this site` };
   }
   return null;
 }

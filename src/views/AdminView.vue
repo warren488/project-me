@@ -727,6 +727,20 @@ onBeforeRouteLeave(
       </div>
     </div>
     <div v-else-if="!state && !error" class="cv-admin__gate">Loading…</div>
+    <div v-else-if="state && !variant" class="cv-admin__gate">
+      <h1 class="cv-admin__gate-title">Nothing here yet</h1>
+      <p>Import a bundle to fill the library and its CV variants.</p>
+      <label for="cv-import" class="a-btn a-btn--success">Import</label>
+    </div>
+    <input
+      id="cv-import"
+      ref="importInput"
+      type="file"
+      accept="application/json,.json"
+      class="d-none"
+      :disabled="busy"
+      @change="importBundle"
+    />
     <div v-if="error" class="alert alert-danger no-print">{{ error }}</div>
 
     <div v-if="state && variant" class="cv-admin__grid">
@@ -777,19 +791,12 @@ onBeforeRouteLeave(
               Export
             </button>
             <label
+              for="cv-import"
               class="a-btn"
               :class="{ 'is-disabled': busy }"
               title="Restore a backup, replacing everything"
             >
               Import
-              <input
-                ref="importInput"
-                type="file"
-                accept="application/json,.json"
-                class="d-none"
-                :disabled="busy"
-                @change="importBundle"
-              />
             </label>
             <button
               class="a-btn"

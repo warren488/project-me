@@ -47,7 +47,14 @@ export function useAuth() {
     user,
     checked,
     email: computed(() => user.value?.email ?? ""),
-    signIn: () => signInWithPopup(instance(), new GoogleAuthProvider()),
+    signIn: () => {
+      const provider = new GoogleAuthProvider();
+      provider.addScope("email");
+      // Always show the account chooser: a brand account (YouTube channel)
+      // carries no email, so the right Google account must be picked.
+      provider.setCustomParameters({ prompt: "select_account" });
+      return signInWithPopup(instance(), provider);
+    },
     signOut: () => firebaseSignOut(instance()),
     // The ID token for the API; refreshed by the SDK as needed.
     idToken: async () => (user.value ? await user.value.getIdToken() : ""),
