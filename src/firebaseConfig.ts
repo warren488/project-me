@@ -2,8 +2,8 @@
 // the function's allow-list do the guarding, not this file. Values come from
 // `firebase apps:sdkconfig web` for project radiant-inferno-8721.
 export const firebaseConfig = {
-  apiKey: "", // TODO: paste from `firebase apps:sdkconfig web`
+  apiKey: "AIzaSyA3fsUYexEoQJ4AFMwDgVLtbzltYzTy4BE",
   authDomain: "radiant-inferno-8721.firebaseapp.com",
   projectId: "radiant-inferno-8721",
-  appId: "", // TODO: paste from `firebase apps:sdkconfig web`
+  appId: "1:934844663182:web:c0809870d7fe7ad61010df",
 };
