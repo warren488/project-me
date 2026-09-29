@@ -13,7 +13,7 @@
     "prepare": "simple-git-hooks",
     "lint": "eslint . && prettier --check .",
     "typecheck": "nuxi typecheck",
-    "deploy": "nuxi generate && firebase deploy --only hosting,functions,firestore:rules",
+    "deploy": "nuxi generate && firebase deploy --only hosting,functions:cvApi,firestore:rules",
     "og:build": "node scripts/build-social-card.js",
     "emulators": "firebase emulators:start --only functions,firestore,auth"
   },

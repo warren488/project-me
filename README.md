@@ -52,7 +52,11 @@ NUXT_PUBLIC_FIRESTORE_EMULATOR=http://127.0.0.1:8085 \
 NUXT_PUBLIC_AUTH_EMULATOR=http://127.0.0.1:9099 npm run dev
 ```
 
-Deploy everything (site, function, Firestore rules) with `npm run deploy`.
+Deploy everything (site, the `cvApi` function, Firestore rules) with
+`npm run deploy`. It names the function on purpose: the project still holds
+two old functions (`api` and `uwibase` in us-central1) that are not in this
+repo, and a bare `--only functions` refuses to run non-interactively until
+they are deleted.
 Firebase settings the code expects: Blaze plan, Firestore in `europe-west2`,
 Google sign-in enabled, and the web app config pasted into
 `app/firebaseConfig.ts`.
