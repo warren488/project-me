@@ -1,0 +1,251 @@
+<script setup lang="ts">
+import { site } from "@/data/site";
+</script>
+
+<template>
+  <header class="app-header primary-polkadot-bg">
+    <div class="app-header__container container">
+      <NuxtLink class="app-header__logo" to="/" aria-label="Home">
+        <svg
+          class="app-header__image"
+          version="1.1"
+          viewBox="0.0 0.0 960.0 720.0"
+          fill="none"
+          stroke="none"
+          stroke-linecap="square"
+          stroke-miterlimit="10"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <clipPath id="p.0">
+            <path
+              d="m0 0l960.0 0l0 720.0l-960.0 0l0 -720.0z"
+              clip-rule="nonzero"
+            />
+          </clipPath>
+          <g clip-path="url(#p.0)">
+            <path
+              class="path w-path"
+              stroke="currentColor"
+              stroke-width="40.0"
+              stroke-linejoin="round"
+              stroke-linecap="butt"
+              d="m0 693.3746c103.17983 -185.86133 169.54166 -387.6846 226.8323 -588.98016c42.894928 -150.7149 -183.97818 317.59485 -106.73468 456.75818c58.738052 105.82361 128.08733 -206.68579 186.8068 -312.51776c16.032959 -28.896667 -10.0954895 63.99434 -13.341827 96.16664c-9.476868 93.91876 -24.187408 229.6735 66.70917 276.46237c31.139282 16.02887 73.516174 -21.213745 93.41397 -48.092834c92.1297 -124.45413 66.70917 -295.13324 66.70917 -444.72067c0 -32.055542 -25.162567 -118.83331 0 -96.166626"
+              fill-rule="evenodd"
+            />
+            <path
+              class="path s-path"
+              stroke="currentColor"
+              stroke-width="40.0"
+              stroke-linejoin="round"
+              stroke-linecap="butt"
+              d="m370.0394 761.2823c132.92691 -229.41852 324.99313 -459.56476 324.99313 -709.1647c0 -21.66657 -34.93091 14.463718 -32.496765 36.055347c14.434692 128.03864 24.47638 127.491165 65.019226 252.42549c22.896545 70.55664 86.922 155.98181 32.496704 216.3511c-48.176514 53.43811 -308.19373 65.447876 -259.99963 12.018494"
+              fill-rule="evenodd"
+            />
+          </g>
+        </svg>
+      </NuxtLink>
+      <nav aria-label="Main">
+        <ul class="app-header__links">
+          <li>
+            <NuxtLink to="/timeline" class="nav-link nav-link--text">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"
+                />
+              </svg>
+              Timeline
+            </NuxtLink>
+          </li>
+          <li>
+            <a
+              :href="site.github"
+              class="nav-link nav-link--icon"
+              target="_blank"
+              rel="noopener"
+              aria-label="GitHub"
+              title="GitHub"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+                />
+              </svg>
+            </a>
+          </li>
+          <li>
+            <a
+              :href="site.linkedin"
+              class="nav-link nav-link--icon"
+              target="_blank"
+              rel="noopener"
+              aria-label="LinkedIn"
+              title="LinkedIn"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"
+                />
+              </svg>
+            </a>
+          </li>
+          <li>
+            <a
+              :href="`mailto:${site.email}`"
+              class="nav-link nav-link--icon"
+              aria-label="Email"
+              title="Email"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.436-.586L16 11.801V4.697l-5.803 3.546z"
+                />
+              </svg>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+</template>
+
+<style scoped lang="scss">
+.w-path {
+  stroke-dasharray: 2682;
+  stroke-dashoffset: 2682;
+  animation: dash 0.4s linear forwards;
+}
+.s-path {
+  stroke-dasharray: 1660;
+  stroke-dashoffset: 1660;
+  animation: dash 0.4s linear forwards 0.4s;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w-path,
+  .s-path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+.app-header {
+  background-color: var(--primary);
+  width: 100%;
+}
+
+.app-header__container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding-top: 0.5rem;
+  border-bottom: solid thin var(--line);
+}
+
+.app-header__logo {
+  display: inline-block;
+  padding-bottom: 0.25rem;
+  color: var(--secondary);
+  filter: drop-shadow(0px 0px 3px var(--accent-soft));
+  border-radius: 0.5rem;
+
+  svg {
+    display: block;
+    width: 50px;
+    aspect-ratio: 1;
+  }
+}
+
+.app-header__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  color: var(--secondary);
+  border-radius: 0.5rem;
+  &:hover,
+  &:focus-visible {
+    color: var(--accent);
+  }
+}
+
+.nav-link--text {
+  gap: 0.4rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+
+  &.router-link-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+}
+
+.nav-link--icon {
+  padding: 0.5rem;
+}
+
+@media (max-width: 576px) {
+  .app-header__container {
+    justify-content: center;
+  }
+  .app-header__logo {
+    flex-basis: 100%;
+    text-align: center;
+    padding-bottom: 0;
+    svg {
+      margin: 0 auto;
+    }
+  }
+}
+</style>

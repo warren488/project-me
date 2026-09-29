@@ -1,0 +1,9 @@
+.nuxt
+.output
+.firebase
+node_modules
+functions
+scripts
+package-lock.json
+cv-bundle*.json
+public
