@@ -25,7 +25,7 @@ pnpm-debug.log*
 # Firebase
 functions/node_modules
 functions/.env.local
-firebase-debug.log
+*-debug.log
 .firebase/
 # Content backups exported from the admin
 cv-bundle*.json
