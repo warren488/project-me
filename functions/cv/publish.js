@@ -1,0 +1,527 @@
+// Resolves CV variants against the library and publishes what the public
+// site reads: the published CVs, the timeline and the project cards. Reads
+// and writes go through a store (see store.js), so the same code serves the
+// Cloud Function (Firestore) and the scripts in scripts/ (JSON files).
+
+// Which entry kind each page section accepts.
+const LAYOUTS = ["styled", "ats"];
+
+const SECTION_KINDS = {
+  education: "education",
+  competencies: "competency",
+  achievements: "achievement",
+  skills: "skill",
+  experience: "job",
+  projects: "project",
+  interests: "interest",
+};
+
+// Engagements (clients worked with under a job) never appear in a variant
+// directly: they render under their parent job, and on the timeline.
+const ENGAGEMENT_KIND = "engagement";
+const KINDS = [...Object.values(SECTION_KINDS), ENGAGEMENT_KIND];
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+// "2022-10" -> "Oct 2022", "2021" -> "2021"
+function formatDate(value) {
+  const [year, month] = value.split("-");
+  return month ? `${MONTHS[Number(month) - 1]} ${year}` : year;
+}
+
+function formatRange(entry) {
+  if (!entry.start) return undefined;
+  const end = entry.end ? formatDate(entry.end) : "Present";
+  return `${formatDate(entry.start)} – ${end}`;
+}
+
+// Sections that live in the sidebar of the styled layout. The sidebar flows
+// across sheets like the main column; only the name and contact block is
+// limited to the first sheet.
+const SIDEBAR_SECTIONS = [
+  "education",
+  "competencies",
+  "achievements",
+  "interests",
+];
+
+// "2021-09" -> 24261; a bare year counts as January of that year.
+// Tech is stored as a list; the CV and timeline print it as one line.
+const joinTech = (tech) =>
+  Array.isArray(tech) ? tech.join(" • ") : tech || undefined;
+
+const monthIndex = (date) => {
+  const [y, m] = date.split("-").map(Number);
+  return y * 12 + ((m || 1) - 1);
+};
+
+const SECTION_ORDERS = ["manual", "date"];
+
+const isBreak = (item) =>
+  !!item && typeof item === "object" && item.break === true;
+
+// Newest first, current roles ahead of finished ones started the same
+// month, undated entries last in their existing order. Page breaks keep their
+// positions. Mirrors src/cv/order.ts.
+function sortRefsByDate(refs, byId) {
+  const key = (ref) => {
+    const entry = byId.get(typeof ref === "string" ? ref : ref.id);
+    if (!entry || !entry.start) return null;
+    return [monthIndex(entry.start), entry.end === null ? 1 : 0];
+  };
+  const sorted = refs
+    .filter((r) => !isBreak(r))
+    .map((ref, i) => ({ ref, i, k: key(ref) }))
+    .sort((a, b) => {
+      if (!a.k && !b.k) return a.i - b.i;
+      if (!a.k) return 1;
+      if (!b.k) return -1;
+      return b.k[0] - a.k[0] || b.k[1] - a.k[1] || a.i - b.i;
+    })
+    .map((x) => x.ref);
+  let n = 0;
+  return refs.map((r) => (isBreak(r) ? r : sorted[n++]));
+}
+
+const refId = (ref) => (typeof ref === "string" ? ref : ref.id);
+
+// How a job ref treats one of its engagements. A ref's `engagements` is
+// absent/true (all of them, all bullets), false (none), or a map of
+// deviations keyed by engagement id: { show?: boolean, bullets?: string[] }.
+// An engagement with show: false and a bullet list is hidden as a block, and
+// those bullets print under the job's own bullets instead ("rolled up").
+// Returns { show, bullets } where bullets undefined means "all of them".
+function engagementPick(ref, engagementId, where) {
+  const setting = typeof ref === "string" ? undefined : ref.engagements;
+  if (setting === undefined || setting === true) return { show: true };
+  if (setting === false) return { show: false, bullets: [] };
+  if (typeof setting !== "object" || Array.isArray(setting)) {
+    throw new Error(
+      `${where || "ref"}: "engagements" must be true, false or a map`
+    );
+  }
+  const pick = setting[engagementId];
+  if (pick === undefined) return { show: true };
+  if (!pick || typeof pick !== "object") {
+    throw new Error(`${where || "ref"}: bad engagement pick "${engagementId}"`);
+  }
+  if (pick.show !== undefined && typeof pick.show !== "boolean") {
+    throw new Error(`${where || "ref"}: "show" must be a boolean`);
+  }
+  if (pick.bullets !== undefined && !Array.isArray(pick.bullets)) {
+    throw new Error(`${where || "ref"}: "bullets" must be a list`);
+  }
+  const show = pick.show !== false;
+  return { show, bullets: pick.bullets || (show ? undefined : []) };
+}
+
+// Calls fn(ref, sectionName) for every entry reference in a variant.
+function eachRef(variant, fn) {
+  for (const item of variant.sections || []) {
+    if (isBreak(item)) continue;
+    for (const ref of item.refs || []) {
+      if (!isBreak(ref)) fn(ref, item.section);
+    }
+  }
+}
+
+// A variant is one ordered list of sections, each with ordered refs. Page
+// breaks ({ break: true }) can sit between sections or between the refs of a
+// section; everything after a break lands on the next sheet, whichever
+// column it belongs to, and the sheet after a mid-section break repeats that
+// section's heading as "(continued)". The result is one CVPage per sheet.
+function resolveVariant(library, variant) {
+  const byId = new Map(library.entries.map((e) => [e.id, e]));
+  const where = `variant "${variant.id}"`;
+
+  if (variant.layout !== undefined && !LAYOUTS.includes(variant.layout)) {
+    throw new Error(`${where}: unknown layout "${variant.layout}"`);
+  }
+  if (!Array.isArray(variant.sections)) {
+    throw new Error(`${where}: "sections" must be a list`);
+  }
+
+  const lookup = (ref, section) => {
+    const id = typeof ref === "string" ? ref : ref.id;
+    const entry = byId.get(id);
+    if (!entry)
+      throw new Error(`${where}: unknown entry "${id}" in ${section}`);
+    if (entry.kind !== SECTION_KINDS[section]) {
+      throw new Error(
+        `${where}: "${id}" is a ${entry.kind}, not allowed in ${section}`
+      );
+    }
+    return { entry, ref };
+  };
+
+  // The texts of the listed bullet ids, in that order; all of them if none
+  // are listed.
+  const pickBullets = (entry, ids) => {
+    const bullets = entry.bullets || [];
+    if (!ids) return bullets.map((b) => b.text);
+    return ids.map((bulletId) => {
+      const bullet = bullets.find((b) => b.id === bulletId);
+      if (!bullet)
+        throw new Error(
+          `${where}: unknown bullet "${bulletId}" on "${entry.id}"`
+        );
+      return bullet.text;
+    });
+  };
+
+  // Engagements under a job, newest first. Undated ones keep file order.
+  const engagementsOf = (job) =>
+    library.entries
+      .filter((e) => e.kind === ENGAGEMENT_KIND && e.parent === job.id)
+      .sort(
+        (a, b) =>
+          (b.start ? monthIndex(b.start) : -1) -
+          (a.start ? monthIndex(a.start) : -1)
+      );
+
+  // --- Cut the list into sheets ---
+  // sheet = { order: [section...], items: { section: [{entry, ref}] }, continued: Set }
+  const newSheet = () => ({ order: [], items: {}, continued: new Set() });
+  const sheets = [newSheet()];
+  const started = new Set(); // sections that already have items on an earlier sheet
+  const seenSection = new Set();
+
+  const add = (sheet, section, resolved) => {
+    if (!sheet.order.includes(section)) sheet.order.push(section);
+    (sheet.items[section] = sheet.items[section] || []).push(resolved);
+  };
+  const cut = () => {
+    const current = sheets[sheets.length - 1];
+    if (current.order.length || sheets.length > 1) sheets.push(newSheet());
+    for (const section of current.order) started.add(section);
+  };
+
+  for (const item of variant.sections) {
+    if (isBreak(item)) {
+      cut();
+      continue;
+    }
+    const { section } = item;
+    if (!SECTION_KINDS[section])
+      throw new Error(`${where}: unknown section "${section}"`);
+    if (seenSection.has(section))
+      throw new Error(`${where}: section "${section}" is listed twice`);
+    seenSection.add(section);
+    if (!Array.isArray(item.refs))
+      throw new Error(`${where}: section "${section}" has no refs list`);
+    if (item.order !== undefined && !SECTION_ORDERS.includes(item.order)) {
+      throw new Error(`${where}: unknown order "${item.order}" in ${section}`);
+    }
+    const refs =
+      item.order === "date" ? sortRefsByDate(item.refs, byId) : item.refs;
+
+    for (const ref of refs) {
+      if (isBreak(ref)) {
+        cut();
+        continue;
+      }
+      const target = sheets[sheets.length - 1];
+      add(target, section, lookup(ref, section));
+      if (started.has(section)) target.continued.add(section);
+    }
+  }
+  // Drop an empty trailing sheet left by a final break.
+  while (sheets.length > 1 && !sheets[sheets.length - 1].order.length) {
+    sheets.pop();
+  }
+
+  // --- Render each sheet as a CVPage ---
+  const { name, email, website, phone, location } = library.profile;
+
+  return sheets.map((sheet, index) => {
+    const out = {
+      profile: { name, title: variant.title, email, website },
+      sections: sheet.order,
+    };
+    if (variant.contact) {
+      if (phone) out.profile.phone = phone;
+      if (location) out.profile.location = location;
+    }
+    if (index === 0 && variant.summary) out.profile.summary = variant.summary;
+    if (sheet.continued.size) out.continued = [...sheet.continued];
+
+    const items = (section) => sheet.items[section] || [];
+    for (const section of sheet.order) {
+      if (section === "education") {
+        out.education = items(section).map(({ entry }) => ({
+          degree: entry.title,
+          uni: entry.org,
+          dates: formatRange(entry),
+          details: entry.details,
+        }));
+      } else if (section === "competencies") {
+        out.competencies = items(section).map(({ entry }) => entry.title);
+      } else if (section === "achievements") {
+        out.achievements = items(section).map(({ entry }) => ({
+          role: entry.title,
+          org: entry.org,
+          note: entry.details,
+        }));
+      } else if (section === "skills") {
+        // Grouped by category, in the order categories first appear.
+        out.skills = {};
+        for (const { entry } of items(section)) {
+          if (!out.skills[entry.category]) out.skills[entry.category] = [];
+          out.skills[entry.category].push(entry.title);
+        }
+      } else if (section === "experience") {
+        out.experience = items(section).map(({ entry, ref }) => {
+          const job = {
+            title: entry.title,
+            company: entry.org,
+            dates: formatRange(entry),
+            details: pickBullets(
+              entry,
+              typeof ref === "string" ? undefined : ref.bullets
+            ),
+          };
+          const own = engagementsOf(entry);
+          const picks = typeof ref === "string" ? undefined : ref.engagements;
+          if (picks && typeof picks === "object") {
+            for (const key of Object.keys(picks)) {
+              if (!own.some((e) => e.id === key))
+                throw new Error(
+                  `${where}: "${key}" is not an engagement of "${entry.id}"`
+                );
+            }
+          }
+          const engagements = [];
+          for (const eng of own) {
+            const pick = engagementPick(ref, eng.id, where);
+            if (pick.show) {
+              engagements.push({
+                client: eng.title,
+                dates: formatRange(eng),
+                details: pickBullets(eng, pick.bullets),
+              });
+            } else if (pick.bullets && pick.bullets.length) {
+              job.details.push(...pickBullets(eng, pick.bullets));
+            }
+          }
+          if (engagements.length) job.engagements = engagements;
+          return job;
+        });
+      } else if (section === "interests") {
+        out.interests = items(section).map(({ entry }) => ({
+          name: entry.title,
+          desc: entry.details,
+        }));
+      } else if (section === "projects") {
+        out.projects = items(section).map(({ entry }) => ({
+          title: entry.title,
+          desc: entry.details || entry.tagline,
+          tech: joinTech(entry.tech),
+        }));
+      }
+    }
+    return out;
+  });
+}
+
+// Entry kinds shown on the public timeline unless the entry says otherwise
+// with `timeline: true|false`. Anything undated is never shown.
+const TIMELINE_DEFAULT_KINDS = ["job", ENGAGEMENT_KIND, "education"];
+
+const onTimeline = (entry) =>
+  !!entry.start &&
+  (typeof entry.timeline === "boolean"
+    ? entry.timeline
+    : TIMELINE_DEFAULT_KINDS.includes(entry.kind));
+
+// The public timeline: dated entries only, most recent first, without any
+// contact details.
+function resolveTimeline(library) {
+  const endOf = (e) => (e.end ? monthIndex(e.end) : Infinity);
+  // Newest first. A job that starts the same month as one of its own
+  // engagements sits below it, so its rail starts at the job and runs up.
+  const nest = (a, b) => (a.parent === b.id ? -1 : b.parent === a.id ? 1 : 0);
+  return library.entries
+    .filter(onTimeline)
+    .sort(
+      (a, b) =>
+        monthIndex(b.start) - monthIndex(a.start) ||
+        nest(a, b) ||
+        endOf(b) - endOf(a)
+    )
+    .map((entry) => {
+      const item = {
+        id: entry.id,
+        kind: entry.kind,
+        title: entry.title,
+        start: entry.start,
+        end: entry.end === undefined ? null : entry.end,
+        dates: formatRange(entry),
+        tags: entry.tags,
+      };
+      if (entry.org) item.org = entry.org;
+      if (entry.parent) item.parent = entry.parent;
+      if (entry.details) item.details = entry.details;
+      if (entry.tech && entry.tech.length) item.tech = joinTech(entry.tech);
+      if (entry.bullets) {
+        item.bullets = entry.bullets
+          .filter((b) => b.timeline !== false)
+          .map((b) => b.text);
+      }
+      if (entry.recent === false) item.recent = false;
+      return item;
+    });
+}
+
+// Every engagement must point at a job that exists.
+function checkEngagements(library) {
+  const byId = new Map(library.entries.map((e) => [e.id, e]));
+  for (const e of library.entries) {
+    if (e.kind !== ENGAGEMENT_KIND) continue;
+    const parent = e.parent && byId.get(e.parent);
+    if (!parent || parent.kind !== "job")
+      throw new Error(
+        `engagement "${e.id}" needs a parent job (got "${e.parent}")`
+      );
+  }
+}
+
+// The public timeline document.
+function siteTimeline(library) {
+  checkEngagements(library);
+  return { name: library.profile.name, items: resolveTimeline(library) };
+}
+
+async function publishTimeline(store) {
+  const timeline = siteTimeline(await store.readLibrary());
+  await store.updateSite({ timeline });
+  return timeline;
+}
+
+// --- Projects on the site -------------------------------------------------
+// The home page's project cards come from the library too. Hidden projects
+// (and the private notes on any entry) never leave the library.
+const PROJECT_STATUSES = ["live", "open-source", "in-progress", "client"];
+const PROJECT_HOMES = ["featured", "more", "hidden"];
+
+function resolveProjects(library) {
+  return library.entries
+    .filter((e) => e.kind === "project" && PROJECT_HOMES.includes(e.home))
+    .filter((e) => e.home !== "hidden")
+    .map((e) => {
+      for (const field of ["tagline", "description", "year", "status"]) {
+        if (e[field] === undefined || e[field] === "")
+          throw new Error(
+            `project "${e.id}" is on the site but has no ${field}`
+          );
+      }
+      return {
+        id: e.id,
+        title: e.title,
+        tagline: e.tagline,
+        description: e.description,
+        tech: e.tech || [],
+        year: e.year,
+        status: e.status,
+        links: {
+          live: (e.links && e.links.live) || null,
+          source: (e.links && e.links.source) || null,
+        },
+        tags: e.tags || [],
+        home: e.home,
+      };
+    })
+    .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+}
+
+async function publishProjects(store) {
+  const projects = resolveProjects(await store.readLibrary());
+  await store.updateSite({ projects });
+  return projects;
+}
+
+// Everything on the site that comes straight from the library, in one write.
+// Every library save triggers this; the CVs need a publish step instead.
+async function publishSiteData(store) {
+  const library = await store.readLibrary();
+  const timeline = siteTimeline(library);
+  const projects = resolveProjects(library);
+  await store.updateSite({ timeline, projects });
+  return { count: timeline.items.length, projects: projects.length };
+}
+
+// The site publishes one variant per layout: the rich two-column CV it shows
+// on screen, and the plain ATS one it offers when printing.
+const SITE_DEFAULTS = ["full", "ats"];
+
+async function readPublished(store) {
+  const { published } = await store.readSite();
+  return {
+    styled: (published && published.styled) || null,
+    ats: (published && published.ats) || null,
+  };
+}
+
+// Publishes each variant into the slot for its layout, keeping the other
+// slot as it was, and refreshes the timeline and projects alongside so the
+// whole site bundle is written once. Returns the published CVs.
+async function publish(store, variantIds = SITE_DEFAULTS) {
+  const ids = Array.isArray(variantIds) ? variantIds : [variantIds];
+  const library = await store.readLibrary();
+  const published = await readPublished(store);
+  for (const id of ids) {
+    const variant = await store.readVariant(id);
+    const layout = variant.layout || "styled";
+    published[layout] = {
+      variant: variant.id,
+      layout,
+      pages: resolveVariant(library, variant),
+    };
+  }
+  await store.updateSite({
+    published,
+    timeline: siteTimeline(library),
+    projects: resolveProjects(library),
+  });
+  return published;
+}
+
+module.exports = {
+  resolveVariant,
+  eachRef,
+  isBreak,
+  refId,
+  engagementPick,
+  resolveProjects,
+  publishProjects,
+  publishSiteData,
+  PROJECT_STATUSES,
+  PROJECT_HOMES,
+  SIDEBAR_SECTIONS,
+  resolveTimeline,
+  siteTimeline,
+  checkEngagements,
+  publish,
+  readPublished,
+  SITE_DEFAULTS,
+  publishTimeline,
+  onTimeline,
+  formatRange,
+  SECTION_KINDS,
+  ENGAGEMENT_KIND,
+  KINDS,
+  TIMELINE_DEFAULT_KINDS,
+  LAYOUTS,
+};

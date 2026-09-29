@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The public site reads one document: the published CVs, the timeline and
+    // the project cards, as written by the cvApi function on publish.
+    match /site/content {
+      allow read: if true;
+      allow write: if false;
+    }
+    // The library (including private notes) and the variants are only ever
+    // touched by the cvApi function, which uses the Admin SDK and bypasses
+    // these rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

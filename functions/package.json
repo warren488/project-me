@@ -1,0 +1,17 @@
+{
+  "name": "project-me-functions",
+  "private": true,
+  "description": "The API behind /admin: reads and writes the CV content in Firestore.",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions,firestore",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}
