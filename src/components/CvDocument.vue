@@ -19,7 +19,11 @@ const merged = computed(() => mergePages(props.pages));
 </script>
 
 <template>
-  <div class="cv-wrapper" :class="{ 'is-paged': paged }">
+  <div
+    class="cv-wrapper"
+    :class="{ 'is-paged': paged }"
+    :style="{ '--sheet-count': pages.length }"
+  >
     <!-- Continuous view for the screen -->
     <div v-if="merged" class="cv-container cv-screen">
       <CvPage :page="merged" />
@@ -100,11 +104,16 @@ const merged = computed(() => mergePages(props.pages));
   }
 
   .cv-wrapper {
-    /* "absolute" lets it flow across pages; "fixed" would repeat it. */
+    /* "absolute" lets it flow across pages; "fixed" would repeat it. With no
+       positioned ancestor its containing block is the page area, so 100% of
+       its height is one printed page: size it to exactly the sheets it holds.
+       Firefox drops anything that overflows an absolute box past its last
+       page, so the wrapper must be tall enough for every sheet. */
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
+    height: calc(var(--sheet-count) * 100%);
     margin: 0;
     padding: 0;
     z-index: 9999;
@@ -121,14 +130,17 @@ const merged = computed(() => mergePages(props.pages));
     display: block;
     max-width: none;
     width: 100%;
+    height: 100%;
   }
 
   /* One sheet per page, clipped, with a hard break after each. Sized to the
-     printable area (100vh is one page in print) rather than fixed mm, so it
-     fits whatever paper and margins the print dialog ends up with. */
+     printable area (an equal share of the wrapper above) rather than fixed
+     mm, so it fits whatever paper and margins the print dialog ends up with.
+     Not 100vh: Firefox resolves vh in print to more than the page box, so
+     every sheet spilled onto an extra page and lost its bottom. */
   .cv-page {
     width: 100%;
-    height: 100vh;
+    height: calc(100% / var(--sheet-count));
     margin: 0;
     border-radius: 0;
     box-shadow: none;
