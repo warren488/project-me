@@ -1,6 +1,6 @@
-// Where the CV data lives. The Cloud Function keeps it in Firestore; the
-// scripts in scripts/ can still read the JSON files the repo used to hold.
-// Both expose the same async interface, so publish.js and api.js don't care.
+// Where the CV data lives. The Cloud Function keeps it in Firestore; a file
+// store over JSON files exists for scripts and tests. Both expose the same
+// async interface, so publish.js and api.js don't care.
 //
 //   readLibrary()          { profile, entries }
 //   writeLibrary(library)
