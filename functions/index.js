@@ -5,11 +5,17 @@ const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
-const { defineString } = require("firebase-functions/params");
+const { defineSecret, defineString } = require("firebase-functions/params");
 const { createHandler } = require("./cv/api");
 const { createFirestoreStore } = require("./cv/store");
+const { createProvider } = require("./cv/ai");
 
 const ALLOWED_EMAILS = defineString("ALLOWED_EMAILS");
+// The model behind "Condense" (see functions/.env). The key is a secret.
+const AI_PROVIDER = defineString("AI_PROVIDER");
+const AI_MODEL = defineString("AI_MODEL");
+const AI_BASE_URL = defineString("AI_BASE_URL");
+const AI_API_KEY = defineSecret("AI_API_KEY");
 
 initializeApp();
 const db = getFirestore();
@@ -63,9 +69,23 @@ const handler = createHandler({
   store: createFirestoreStore(db),
   authorize,
   prefix: "/api/cv",
+  // Built per request: params and secrets only resolve at runtime.
+  provider: () =>
+    createProvider({
+      provider: AI_PROVIDER.value(),
+      model: AI_MODEL.value(),
+      baseUrl: AI_BASE_URL.value(),
+      apiKey: AI_API_KEY.value(),
+    }),
 });
 
 exports.cvApi = onRequest(
-  { region: "europe-west2", memory: "256MiB", timeoutSeconds: 30 },
+  {
+    region: "europe-west2",
+    memory: "256MiB",
+    // Hosting's rewrite gives up at 60 s, so a longer budget buys nothing.
+    timeoutSeconds: 60,
+    secrets: [AI_API_KEY],
+  },
   handler
 );

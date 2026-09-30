@@ -4,6 +4,7 @@ import type {
   Bullet,
   EntryKind,
   EntryUsage,
+  Highlight,
   LibraryEntry,
   ProjectHome,
   ProjectStatus,
@@ -13,6 +14,7 @@ import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
 } from "@/cv/types";
+import CondenseDialog from "./CondenseDialog.vue";
 
 // Add / edit one library entry. The parent owns saving; this component only
 // turns the form into a clean LibraryEntry and emits it.
@@ -24,6 +26,7 @@ const props = defineProps<{
   usage?: EntryUsage;
   timelineKinds: string[]; // kinds shown on the timeline by default
   jobs?: LibraryEntry[]; // parents an engagement can sit under
+  variants?: { id: string; name: string }[]; // the CVs, for condensed groups
   busy: boolean;
 }>();
 
@@ -94,6 +97,17 @@ interface BulletForm {
   customId: boolean;
 }
 
+// A condensed highlight: no tags or timeline flag, but the CV it was written
+// for ("" = general) and the bullets it came from (kept as it was, only the
+// text is edited here).
+interface HighlightForm {
+  id: string;
+  text: string;
+  for: string;
+  from: string[];
+  customId: boolean;
+}
+
 const HOME_LABELS: Record<ProjectHome, string> = {
   featured: "Featured",
   more: "More projects",
@@ -125,6 +139,7 @@ const form = reactive({
   tags: "",
   notes: "",
   bullets: [] as BulletForm[],
+  highlights: [] as HighlightForm[],
 });
 const customId = ref(false); // user typed their own id, stop auto-generating
 const message = ref("");
@@ -164,6 +179,13 @@ watch(
         timeline: b.timeline !== false,
         customId: true,
       })),
+      highlights: (entry?.highlights ?? []).map((h) => ({
+        id: h.id,
+        text: h.text,
+        for: h.for ?? "",
+        from: [...(h.from ?? [])],
+        customId: true,
+      })),
     });
     customId.value = !!entry;
     message.value = "";
@@ -191,20 +213,22 @@ watch(
   }
 );
 
-const bulletAutoId = (bullet: BulletForm) => {
-  const base = `${form.id.replace(/^[a-z]+-/, "")}-${slug(
-    bullet.text.split(/\s+/).slice(0, 3).join(" ")
+// Bullets and highlights share one id space on the entry.
+const idTaken = (id: string, except: BulletForm | HighlightForm) =>
+  form.bullets.some((b) => b !== except && b.id === id) ||
+  form.highlights.some((h) => h !== except && h.id === id);
+
+const autoRowId = (row: BulletForm | HighlightForm, mark: string) => {
+  const base = `${form.id.replace(/^[a-z]+-/, "")}${mark}-${slug(
+    row.text.split(/\s+/).slice(0, 3).join(" ")
   )}`.replace(/-+$/, "");
   let candidate = base || "bullet";
-  for (
-    let n = 2;
-    form.bullets.some((b) => b !== bullet && b.id === candidate);
-    n++
-  ) {
-    candidate = `${base}-${n}`;
-  }
+  for (let n = 2; idTaken(candidate, row); n++) candidate = `${base}-${n}`;
   return candidate;
 };
+const bulletAutoId = (bullet: BulletForm) => autoRowId(bullet, "");
+const highlightAutoId = (highlight: HighlightForm) =>
+  autoRowId(highlight, "-hl");
 
 watch(
   () => form.bullets.map((b) => b.text),
@@ -214,8 +238,129 @@ watch(
     }
   }
 );
+watch(
+  () => form.highlights.map((h) => h.text),
+  () => {
+    for (const highlight of form.highlights) {
+      if (!highlight.customId) highlight.id = highlightAutoId(highlight);
+    }
+  }
+);
 
 const bulletUsedIn = (id: string) => props.usage?.bullets[id] ?? [];
+
+// The source bullets a highlight was condensed from, for its tooltip.
+const sourceText = (from: string[]) =>
+  from
+    .map((id) => form.bullets.find((b) => b.id === id)?.text)
+    .filter((t): t is string => !!t)
+    .map((t) => t.replace(/<[^>]+>/g, ""))
+    .join("\n");
+
+// Highlights grouped by the CV they were written for: every CV first (in
+// the dashboard's order), then General, then any CV that no longer exists.
+interface HighlightGroup {
+  id: string; // variant id, "" for general
+  name: string;
+  items: HighlightForm[];
+}
+const highlightGroups = computed((): HighlightGroup[] => {
+  const known = props.variants ?? [];
+  const groups: HighlightGroup[] = known.map((v) => ({
+    id: v.id,
+    name: v.name,
+    items: [],
+  }));
+  groups.push({ id: "", name: "General (any CV)", items: [] });
+  for (const h of form.highlights) {
+    let group = groups.find((g) => g.id === h.for);
+    if (!group) {
+      group = { id: h.for, name: `${h.for} (no such CV)`, items: [] };
+      groups.push(group);
+    }
+    group.items.push(h);
+  }
+  return groups;
+});
+
+function addHighlight(forId: string) {
+  form.highlights.push({
+    id: "",
+    text: "",
+    for: forId,
+    from: [],
+    customId: false,
+  });
+}
+
+function removeHighlight(highlight: HighlightForm) {
+  const used = bulletUsedIn(highlight.id);
+  if (
+    used.length &&
+    !confirm(
+      `This highlight is used by ${used.join(
+        ", "
+      )}. Removing it here means it must be unticked there before this can be saved. Continue?`
+    )
+  ) {
+    return;
+  }
+  form.highlights.splice(form.highlights.indexOf(highlight), 1);
+}
+
+// Moves a highlight within its CV's group.
+function moveHighlight(
+  group: HighlightGroup,
+  highlight: HighlightForm,
+  by: number
+) {
+  const at = group.items.indexOf(highlight);
+  const other = group.items[at + by];
+  if (!other) return;
+  const list = form.highlights;
+  const i = list.indexOf(highlight);
+  const j = list.indexOf(other);
+  [list[i], list[j]] = [list[j], list[i]];
+}
+
+// --- Condense: a model writes a CV's highlights from the saved bullets ---
+const condensing = ref<string | null>(null); // the CV id, "" = general
+const note = ref("");
+
+const savedHighlights = computed(() =>
+  form.highlights.map((h) => {
+    const out: Highlight = { id: h.id, text: h.text };
+    if (h.for) out.for = h.for;
+    return out;
+  })
+);
+const takenIds = computed(() => [
+  ...form.bullets.map((b) => b.id),
+  ...form.highlights.map((h) => h.id),
+]);
+
+function onCondensed(highlights: Highlight[], forId: string, replace: boolean) {
+  if (replace) {
+    for (const h of [...form.highlights]) {
+      if (h.for === forId)
+        form.highlights.splice(form.highlights.indexOf(h), 1);
+    }
+  }
+  for (const h of highlights) {
+    form.highlights.push({
+      id: h.id,
+      text: h.text,
+      for: forId,
+      from: [...(h.from ?? [])],
+      customId: true,
+    });
+  }
+  condensing.value = null;
+  const name = props.variants?.find((v) => v.id === forId)?.name ?? "any CV";
+  note.value = `Added ${highlights.length} for ${name}. Save the entry to keep them${
+    forId ? ", then switch that CV to Condensed under CVs" : ""
+  }.`;
+}
 
 function addBullet() {
   form.bullets.push({
@@ -307,6 +452,14 @@ function toEntry(): LibraryEntry {
       return bullet;
     });
   }
+  if (fields.value.bullets && form.highlights.length) {
+    entry.highlights = form.highlights.map((h): Highlight => {
+      const highlight: Highlight = { id: h.id.trim(), text: h.text.trim() };
+      if (h.for) highlight.for = h.for;
+      if (h.from.length) highlight.from = [...h.from];
+      return highlight;
+    });
+  }
   return entry;
 }
 
@@ -320,6 +473,11 @@ function submit() {
     return (message.value = `An entry with id "${entry.id}" already exists`);
   if (entry.kind === "skill" && !entry.category)
     return (message.value = "Skills need a category");
+  const rowIds = [...(entry.bullets ?? []), ...(entry.highlights ?? [])].map(
+    (r) => r.id
+  );
+  const dup = rowIds.find((id, i) => rowIds.indexOf(id) !== i);
+  if (dup) return (message.value = `Two bullets share the id "${dup}"`);
   if (entry.kind === "engagement" && !entry.parent)
     return (message.value = "An engagement needs a job to sit under");
   if (entry.kind === "project" && entry.home !== "hidden") {
@@ -691,6 +849,137 @@ function remove() {
       </p>
     </div>
 
+    <div v-if="fields.bullets" class="mt-3">
+      <span class="entry-editor__label">
+        Condensed
+        <span class="text-muted fw-normal text-lowercase">
+          · a few bullets per CV standing in for the full list; each CV switches
+          between Full and Condensed under CVs
+        </span>
+      </span>
+      <div v-if="note" class="alert alert-success py-1 px-2 small mt-1 mb-1">
+        {{ note }}
+      </div>
+      <div
+        v-for="group in highlightGroups"
+        :key="group.id"
+        class="entry-editor__hl-group"
+      >
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="entry-editor__hl-name flex-grow-1">
+            {{ group.name }}
+            <span class="text-muted fw-normal">{{ group.items.length }}</span>
+          </span>
+          <button
+            type="button"
+            class="a-btn a-btn--icon"
+            :disabled="isNew || !form.bullets.length"
+            :title="
+              isNew
+                ? 'Save the entry first'
+                : `Write these with a model's help, from the saved bullets`
+            "
+            @click="condensing = group.id"
+          >
+            ✦ Condense…
+          </button>
+          <button
+            type="button"
+            class="a-btn a-btn--icon"
+            title="Add one by hand"
+            @click="addHighlight(group.id)"
+          >
+            + Add
+          </button>
+        </div>
+        <div
+          v-for="highlight in group.items"
+          :key="highlight.id || highlight.text"
+          class="entry-editor__bullet"
+        >
+          <textarea
+            v-model="highlight.text"
+            rows="2"
+            class="form-control form-control-sm"
+            placeholder="One sentence that stands in for several bullets"
+            required
+          ></textarea>
+          <div class="d-flex gap-1 mt-1 align-items-center">
+            <input
+              v-model="highlight.id"
+              class="form-control form-control-sm font-monospace w-auto flex-grow-1"
+              title="Highlight id"
+              :readonly="bulletUsedIn(highlight.id).length > 0"
+              @input="highlight.customId = true"
+            />
+            <span
+              v-if="highlight.from.length"
+              class="chip chip--sm"
+              :title="sourceText(highlight.from)"
+            >
+              from {{ highlight.from.length }}
+            </span>
+            <button
+              type="button"
+              class="a-btn a-btn--icon"
+              title="Move up"
+              :disabled="group.items.indexOf(highlight) === 0"
+              @click="moveHighlight(group, highlight, -1)"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              class="a-btn a-btn--icon"
+              title="Move down"
+              :disabled="
+                group.items.indexOf(highlight) === group.items.length - 1
+              "
+              @click="moveHighlight(group, highlight, 1)"
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              class="a-btn a-btn--icon"
+              title="Remove highlight"
+              @click="removeHighlight(highlight)"
+            >
+              ✕
+            </button>
+          </div>
+          <span
+            v-if="bulletUsedIn(highlight.id).length"
+            class="small text-muted"
+          >
+            Used in {{ bulletUsedIn(highlight.id).join(", ") }}
+          </span>
+        </div>
+        <p v-if="!group.items.length" class="small text-muted mb-0">
+          None yet.
+        </p>
+      </div>
+    </div>
+
+    <!-- Condense: over the editor, since the result lands in this form -->
+    <div
+      v-if="condensing !== null && props.entry"
+      class="entry-editor__modal"
+      @click.self="condensing = null"
+    >
+      <div class="entry-editor__dialog">
+        <CondenseDialog
+          :entry="props.entry"
+          :variants="props.variants ?? []"
+          :initial-for="condensing"
+          :existing="savedHighlights"
+          :taken-ids="takenIds"
+          @accept="onCondensed"
+          @cancel="condensing = null"
+        />
+      </div>
+    </div>
+
     <div v-if="message" class="alert alert-danger py-1 px-2 small mt-3 mb-0">
       {{ message }}
     </div>
@@ -740,6 +1029,38 @@ function remove() {
   border: 1px solid var(--ad-line);
   border-radius: 0.375rem;
   margin-bottom: 0.35rem;
+}
+
+.entry-editor__hl-group {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px dashed var(--ad-line);
+  border-radius: 0.375rem;
+}
+
+.entry-editor__hl-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+// The Condense dialog sits over the editor's own modal.
+.entry-editor__modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  background: var(--ad-modal);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  overflow: auto;
+}
+
+.entry-editor__dialog {
+  background: var(--ad-bg);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  width: min(640px, 100%);
 }
 
 .entry-editor__group {

@@ -52,6 +52,40 @@ NUXT_PUBLIC_FIRESTORE_EMULATOR=http://127.0.0.1:8085 \
 NUXT_PUBLIC_AUTH_EMULATOR=http://127.0.0.1:9099 npm run dev
 ```
 
+### Condensing bullets
+
+The dashboard has two workspaces: **Library** (the content) and **CVs**
+(what each CV prints). In the Library, a job or client engagement's editor
+has a Condensed section with one group per CV: "✦ Condense…" turns the
+saved bullets into a few highlights written for that CV with a model's help
+(the CV's headline and summary are the audience), and each CV can hold its
+own set. Highlights never appear on the timeline. Under CVs, every job and
+client row has a **Full / Condensed** switch: Condensed prints the
+highlights written for that CV (or the general ones), Full prints all the
+bullets, and ticking rows by hand gives a Custom pick. The prompt is always
+built by the function, and the dialog offers three ways to run it:
+
+- **Server**: the provider set in `functions/.env` (`AI_PROVIDER` is
+  `anthropic`, or `openai` for any OpenAI-compatible endpoint such as OpenAI,
+  OpenRouter, Ollama or LM Studio, with `AI_MODEL` and `AI_BASE_URL`). The
+  key lives in Secret Manager: `firebase functions:secrets:set AI_API_KEY`
+  before the first deploy (deploy prompts for it otherwise). Leave
+  `AI_PROVIDER` empty to run without one.
+- **Local model**: the browser calls an OpenAI-compatible server on this
+  machine directly, so it works against the live dashboard for free. The
+  server must allow the dashboard's origin: for Ollama set
+  `OLLAMA_ORIGINS=https://warren.scantlebury.io,http://localhost:3000`; LM
+  Studio has a CORS switch.
+- **Copy prompt**: copy the prompt into any chat tool or CLI (Claude, ChatGPT,
+  Claude Code, Codex) and paste the reply back. It reads the JSON array the
+  prompt asks for, or plain bullet lines.
+
+With the emulators, the server mode can use a local model too: put
+`AI_PROVIDER=openai`, `AI_BASE_URL=http://127.0.0.1:11434/v1` and
+`AI_MODEL=<name>` in `functions/.env.local` and any value for `AI_API_KEY` in
+`functions/.secret.local` (both ignored by git). `npm --prefix functions test`
+covers the prompt, the reply parser and the API route.
+
 Deploy everything (site, the `cvApi` function, Firestore rules) with
 `npm run deploy`. It names the function on purpose: the project still holds
 two old functions (`api` and `uwibase` in us-central1) that are not in this

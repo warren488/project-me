@@ -27,6 +27,8 @@ defineProps<{
   engagementsOf: (jobId: string) => LibraryEntry[];
   expanded: Set<string>;
   sheetOf?: (index: number) => number | undefined;
+  variantId: string; // the CV being edited, for its condensed highlights
+  variantNames: Map<string, string>; // variant id -> name, for row labels
 }>();
 
 const emit = defineEmits<{
@@ -132,6 +134,8 @@ const toggleEntry = (id: string, on: boolean) =>
           :can-up="r > 0"
           :can-down="r < item.refs.length - 1"
           :sheet="sheetOf?.(r)"
+          :variant-id="variantId"
+          :variant-names="variantNames"
           @toggle="toggleEntry(refId(ref), $event)"
           @update="emit('update-ref', r, $event)"
           @move="emit('move-ref', r, $event)"
@@ -160,6 +164,8 @@ const toggleEntry = (id: string, on: boolean) =>
         :can-up="false"
         :can-down="false"
         :absent="absent"
+        :variant-id="variantId"
+        :variant-names="variantNames"
         @toggle="toggleEntry(entry.id, $event)"
       />
     </template>

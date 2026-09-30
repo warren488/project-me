@@ -74,7 +74,11 @@ const busy = ref(false);
 const status = ref("");
 const error = ref("");
 
-const tab = ref<"library" | "layout">("library");
+// Which workspace is open: the Library (content) or the CVs (what each
+// prints). Remembered per browser.
+const WORKSPACE_KEY = "cv-admin-workspace";
+const workspace = ref<"library" | "cvs">("library");
+watch(workspace, (w) => localStorage.setItem(WORKSPACE_KEY, w));
 const showPreview = ref(false); // hidden by default; it still renders offscreen
 // "light" is the plain dashboard; "site" borrows the site's colours and type.
 const THEME_KEY = "cv-admin-theme";
@@ -88,6 +92,9 @@ const paged = ref(true); // preview as A4 sheets so overflow is visible
 
 const entries = computed(() => state.value?.library.entries ?? []);
 const byId = computed(() => new Map(entries.value.map((e) => [e.id, e])));
+const variantNames = computed(
+  () => new Map((state.value?.variants ?? []).map((v) => [v.id, v.name]))
+);
 const sectionForKind = computed(() => {
   const map = {} as Record<EntryKind, SectionName>;
   for (const [section, kind] of Object.entries(state.value?.sections ?? {})) {
@@ -348,6 +355,8 @@ function sectionBind(i: number, absent?: SectionName) {
     byId: byId.value,
     engagementsOf,
     expanded: expandedNodes.value,
+    variantId: variant.value?.id ?? "",
+    variantNames: variantNames.value,
     sheetOf: (index: number) =>
       !absent && sheetCount.value > 1
         ? sheetOf.value.get(`${i}/${index}`)
@@ -686,6 +695,7 @@ const warnOnUnload = (event: BeforeUnloadEvent) => {
 onMounted(() => {
   window.addEventListener("beforeunload", warnOnUnload);
   theme.value = localStorage.getItem(THEME_KEY) === "site" ? "site" : "light";
+  if (localStorage.getItem(WORKSPACE_KEY) === "cvs") workspace.value = "cvs";
 });
 
 // Load once signed in; forget everything on sign-out.
@@ -735,11 +745,6 @@ onBeforeRouteLeave(
       </div>
     </div>
     <div v-else-if="!state && !error" class="cv-admin__gate">Loading…</div>
-    <div v-else-if="state && !variant" class="cv-admin__gate">
-      <h1 class="cv-admin__gate-title">Nothing here yet</h1>
-      <p>Import a bundle to fill the library and its CV variants.</p>
-      <label for="cv-import" class="a-btn a-btn--success">Import</label>
-    </div>
     <input
       id="cv-import"
       ref="importInput"
@@ -751,388 +756,433 @@ onBeforeRouteLeave(
     />
     <div v-if="error" class="alert alert-danger no-print">{{ error }}</div>
 
-    <div v-if="state && variant" class="cv-admin__grid">
-      <section class="cv-admin__panel no-print">
-        <!-- Variant settings -->
-        <div class="cv-admin__variant">
-          <div class="d-flex gap-2 align-items-end flex-wrap">
-            <label class="flex-grow-1">
-              <span class="cv-admin__label">Variant</span>
-              <select
-                class="form-select form-select-sm"
-                :value="variant.id"
-                @change="onSwitchVariant"
-              >
-                <option v-for="v in state.variants" :key="v.id" :value="v.id">
-                  {{ v.name
-                  }}{{
-                    v.id === state.published[v.layout] ? " (published)" : ""
-                  }}
-                </option>
-              </select>
-            </label>
-            <button class="a-btn" :disabled="busy" @click="duplicate">
-              Duplicate
-            </button>
-            <button
-              class="a-btn"
-              title="Name and contact details, shared by every variant"
-              :disabled="busy"
-              @click="editProfile"
-            >
-              Profile
-            </button>
-            <button
-              class="a-btn"
-              title="Regenerate the timeline and project cards on the site. Saving an entry already does this."
-              :disabled="busy"
-              @click="publishSiteData"
-            >
-              Publish site data
-            </button>
-            <button
-              class="a-btn"
-              title="Download a backup of the library and every variant"
-              :disabled="busy"
-              @click="exportBundle"
-            >
-              Export
-            </button>
-            <label
-              for="cv-import"
-              class="a-btn"
-              :class="{ 'is-disabled': busy }"
-              title="Restore a backup, replacing everything"
-            >
-              Import
-            </label>
-            <button
-              class="a-btn"
-              title="Switch between the plain dashboard and the site's own look"
-              @click="toggleTheme"
-            >
-              {{ theme === "site" ? "Light theme" : "Site theme" }}
-            </button>
-            <span class="small text-muted ms-auto text-nowrap">
-              {{ email }}
-              <button class="a-btn ms-1" @click="signOut">Sign out</button>
-            </span>
-          </div>
-          <div class="row g-2 mt-1">
-            <label class="col-6">
-              <span class="cv-admin__label">Variant name</span>
-              <input
-                v-model="variant.name"
-                class="form-control form-control-sm"
-              />
-            </label>
-            <label class="col-6">
-              <span class="cv-admin__label">CV headline</span>
-              <input
-                v-model="variant.title"
-                class="form-control form-control-sm"
-              />
-            </label>
-            <label class="col-12">
-              <span class="cv-admin__label">Summary (HTML allowed)</span>
-              <textarea
-                v-model="variant.summary"
-                rows="3"
-                class="form-control form-control-sm"
-              ></textarea>
-            </label>
-            <label class="col-6">
-              <span class="cv-admin__label">Layout</span>
-              <select
-                class="form-select form-select-sm"
-                :value="variant.layout ?? 'styled'"
-                @change="
-                  variant.layout = ($event.target as HTMLSelectElement)
-                    .value as Variant['layout']
-                "
-              >
-                <option value="styled">Styled (two columns)</option>
-                <option value="ats">ATS (plain single column)</option>
-              </select>
-            </label>
-            <label
-              class="col-6 form-check d-flex align-items-end gap-1 ps-4 mb-0"
-              title="Adds phone and location to this variant. Fine for a PDF, but they'd be public if this variant is published to the site."
-            >
-              <input
-                type="checkbox"
-                class="form-check-input"
-                :checked="!!variant.contact"
-                @change="variant.contact = checked($event) || undefined"
-              />
-              <span class="small">Include phone &amp; location</span>
-            </label>
-          </div>
-          <div class="d-flex gap-2 mt-2 align-items-center flex-wrap">
-            <button
-              class="a-btn a-btn--primary"
-              :disabled="busy || !dirty"
-              @click="save"
-            >
-              Save
-            </button>
-            <button
-              class="a-btn a-btn--success"
-              :disabled="busy"
-              @click="saveAndPublish"
-            >
-              Save &amp; publish
-            </button>
-            <button
-              class="a-btn"
-              :disabled="busy || !dirty || !savedSnapshot"
-              @click="revert"
-            >
-              Revert
-            </button>
-            <span
-              class="small ms-auto"
-              :class="dirty ? 'text-warning' : 'text-success'"
-            >
-              {{ dirty ? "Unsaved changes" : status }}
-            </span>
-          </div>
-        </div>
-
-        <div
-          v-if="
-            variant.contact &&
-            variant.id === state.published[variant.layout ?? 'styled']
-          "
-          class="alert alert-warning py-1 px-2 small"
+    <template v-if="state">
+      <!-- Two workspaces: the Library holds the content; CVs decide what each
+           one prints. Nothing under Library is specific to a CV. -->
+      <div class="cv-admin__tabs cv-admin__switch no-print">
+        <button
+          :class="{ active: workspace === 'library' }"
+          @click="workspace = 'library'"
         >
-          This variant is published with phone and location, so they are visible
-          on the public site.
-        </div>
-        <div
-          v-for="o in overflow"
-          :key="o.page"
-          class="alert alert-danger py-1 px-2 small"
+          Library
+          <span class="cv-admin__count">{{ entries.length }}</span>
+        </button>
+        <button
+          :class="{ active: workspace === 'cvs' }"
+          @click="workspace = 'cvs'"
         >
-          Page {{ o.page }} overflows by about {{ o.mm }}mm. Move something to
-          another page or untick some bullets, or it will be cut off in print.
-        </div>
-        <span v-if="previewError" class="small text-danger d-block mb-2">
-          {{ previewError }}
+          CVs
+          <span class="cv-admin__count">{{ state.variants.length }}</span>
+          <span v-if="dirty" class="cv-admin__badge">unsaved</span>
+        </button>
+        <span
+          class="small ms-auto text-truncate"
+          :class="dirty ? 'text-warning' : 'text-success'"
+        >
+          {{ dirty ? "Unsaved CV changes" : status }}
         </span>
+        <button
+          class="a-btn"
+          title="Switch between the plain dashboard and the site's own look"
+          @click="toggleTheme"
+        >
+          {{ theme === "site" ? "Light theme" : "Site theme" }}
+        </button>
+        <span class="small text-muted text-nowrap">
+          {{ email }}
+          <button class="a-btn ms-1" @click="signOut">Sign out</button>
+        </span>
+      </div>
 
-        <div class="cv-admin__tabs">
-          <button
-            :class="{ active: tab === 'library' }"
-            @click="tab = 'library'"
-          >
-            Library
-          </button>
-          <button :class="{ active: tab === 'layout' }" @click="tab = 'layout'">
-            Layout ({{ placement.size }} on this CV)
-          </button>
-          <button class="ms-auto" @click="showPreview = !showPreview">
-            {{ showPreview ? "Hide preview" : "Show preview" }}
-          </button>
-        </div>
-
-        <!-- Library: the content. Click an entry to edit it. -->
-        <div v-if="tab === 'library'">
-          <LibraryList
-            :entries="entries"
-            :timeline-kinds="state.timelineKinds"
-            :busy="busy"
-            @edit="openEditor"
-            @create="openEditor(null)"
-          />
-        </div>
-
-        <!-- Layout: one ordered list of sections, cut into sheets by breaks -->
-        <div v-else>
-          <p class="small text-muted">
-            Tick what this CV prints: entries, their bullets, and a job's client
-            engagements (untick a client and tick its bullets to print them
-            under the job instead). Dimmed rows aren't on this CV yet. Most
-            important first; page breaks cut the list into printed sheets, and a
-            section that continues repeats its heading.
-          </p>
-          <div class="d-flex gap-2 mb-2 small">
-            <button class="cv-admin__link" @click="collapseAll(true)">
-              Collapse all
-            </button>
-            <button class="cv-admin__link" @click="collapseAll(false)">
-              Expand all
-            </button>
-          </div>
-
-          <!-- Styled layout: sidebar and main side by side, as on the CV -->
-          <template v-if="twoColumn">
-            <template v-for="(group, g) in layoutGroups" :key="g">
-              <div
-                v-if="group.breakIndex !== undefined"
-                class="cv-admin__break"
-              >
-                <span class="flex-grow-1">— page break —</span>
-                <button
-                  class="a-btn a-btn--icon"
-                  title="Remove break"
-                  @click="removeSectionBreak(group.breakIndex)"
-                >
-                  ✕
-                </button>
-              </div>
-              <div class="cv-admin__columns">
-                <div class="cv-admin__column is-sidebar">
-                  <div class="cv-admin__column-title">Sidebar</div>
-                  <VariantSectionEditor
-                    v-for="i in group.sidebar"
-                    :key="i"
-                    v-bind="sectionBind(i)"
-                    :can-up="columnTarget(i, -1) >= 0"
-                    :can-down="columnTarget(i, 1) >= 0"
-                    v-on="sectionOn(i)"
-                    @move="moveInColumn(i, $event)"
-                  />
-                  <template v-if="g === layoutGroups.length - 1">
-                    <VariantSectionEditor
-                      v-for="section in absentSections.filter(isSidebar)"
-                      :key="section"
-                      v-bind="sectionBind(-1, section)"
-                      :can-up="false"
-                      :can-down="false"
-                      v-on="sectionOn(-1, section)"
-                    />
-                  </template>
-                  <p
-                    v-if="!group.sidebar.length && g < layoutGroups.length - 1"
-                    class="small text-muted"
-                  >
-                    Nothing here
-                  </p>
-                </div>
-                <div class="cv-admin__column">
-                  <div class="cv-admin__column-title">Main</div>
-                  <VariantSectionEditor
-                    v-for="i in group.main"
-                    :key="i"
-                    v-bind="sectionBind(i)"
-                    :can-up="columnTarget(i, -1) >= 0"
-                    :can-down="columnTarget(i, 1) >= 0"
-                    v-on="sectionOn(i)"
-                    @move="moveInColumn(i, $event)"
-                  />
-                  <template v-if="g === layoutGroups.length - 1">
-                    <VariantSectionEditor
-                      v-for="section in absentSections.filter(
-                        (s) => !isSidebar(s)
-                      )"
-                      :key="section"
-                      v-bind="sectionBind(-1, section)"
-                      :can-up="false"
-                      :can-down="false"
-                      v-on="sectionOn(-1, section)"
-                    />
-                  </template>
-                  <p
-                    v-if="!group.main.length && g < layoutGroups.length - 1"
-                    class="small text-muted"
-                  >
-                    Nothing here
-                  </p>
-                </div>
-              </div>
-            </template>
-          </template>
-
-          <!-- ATS layout: one column, in reading order -->
-          <template v-else>
-            <template v-for="(item, i) in variant.sections" :key="i">
-              <div v-if="isBreak(item)" class="cv-admin__break">
-                <span class="flex-grow-1">— page break —</span>
-                <button
-                  class="a-btn a-btn--icon"
-                  title="Move up"
-                  :disabled="i === 0"
-                  @click="moveSection(i, -1)"
-                >
-                  ↑
-                </button>
-                <button
-                  class="a-btn a-btn--icon"
-                  title="Move down"
-                  :disabled="i === variant.sections.length - 1"
-                  @click="moveSection(i, 1)"
-                >
-                  ↓
-                </button>
-                <button
-                  class="a-btn a-btn--icon"
-                  title="Remove break"
-                  @click="removeSectionBreak(i)"
-                >
-                  ✕
-                </button>
-              </div>
-              <VariantSectionEditor
-                v-else
-                v-bind="sectionBind(i)"
-                :can-up="i > 0"
-                :can-down="i < variant.sections.length - 1"
-                v-on="sectionOn(i)"
-                @move="moveSection(i, $event)"
-              />
-            </template>
-            <VariantSectionEditor
-              v-for="section in absentSections"
-              :key="section"
-              v-bind="sectionBind(-1, section)"
-              :can-up="false"
-              :can-down="false"
-              v-on="sectionOn(-1, section)"
-            />
-          </template>
-        </div>
-      </section>
-
-      <!-- Preview: rendered even while hidden, so overflow is still measured
-           and printing works. -->
+      <!-- Library workspace -->
       <section
-        class="cv-admin__preview"
-        :class="{ 'is-hidden': !showPreview }"
-        :style="{ width: previewWidth }"
+        v-if="workspace === 'library'"
+        class="cv-admin__panel cv-admin__panel--library no-print"
       >
-        <div class="d-flex gap-2 align-items-center mb-2 no-print">
-          <strong class="small text-dark">Preview</strong>
-          <select
-            v-model.number="zoom"
-            class="form-select form-select-sm w-auto"
+        <div class="d-flex gap-2 align-items-center flex-wrap mb-3">
+          <p class="small text-muted mb-0 flex-grow-1">
+            Everything the site and the CVs draw from. Click an entry to edit
+            it, including its condensed bullets per CV. What each CV prints is
+            chosen under CVs.
+          </p>
+          <button
+            class="a-btn"
+            title="Name and contact details, shared by every CV"
+            :disabled="busy"
+            @click="editProfile"
           >
-            <option :value="0.5">50%</option>
-            <option :value="0.6">60%</option>
-            <option :value="0.75">75%</option>
-            <option :value="1">100%</option>
-          </select>
-          <button class="a-btn" @click="printCv">Print / save PDF</button>
+            Profile
+          </button>
+          <button
+            class="a-btn"
+            title="Regenerate the timeline and project cards on the site. Saving an entry already does this."
+            :disabled="busy"
+            @click="publishSiteData"
+          >
+            Publish site data
+          </button>
+          <button
+            class="a-btn"
+            title="Download a backup of the library and every CV"
+            :disabled="busy"
+            @click="exportBundle"
+          >
+            Export
+          </button>
           <label
-            v-if="(variant.layout ?? 'styled') === 'styled'"
-            class="form-check small mb-0 ms-1"
+            for="cv-import"
+            class="a-btn"
+            :class="{ 'is-disabled': busy }"
+            title="Restore a backup, replacing everything"
           >
-            <input v-model="paged" type="checkbox" class="form-check-input" />
-            A4 pages
+            Import
           </label>
         </div>
-        <div ref="previewEl" class="cv-admin__zoom" :style="{ zoom }">
-          <template v-if="preview.length">
-            <CvAtsDocument v-if="variant.layout === 'ats'" :pages="preview" />
-            <CvDocument
-              v-else
-              :pages="preview"
-              :paged="paged || !showPreview"
-            />
-          </template>
-        </div>
+        <LibraryList
+          :entries="entries"
+          :timeline-kinds="state.timelineKinds"
+          :busy="busy"
+          @edit="openEditor"
+          @create="openEditor(null)"
+        />
       </section>
-    </div>
+
+      <!-- CVs workspace: kept mounted (v-show) so the preview keeps measuring
+           overflow and printing works. -->
+      <div v-show="workspace === 'cvs'" class="cv-admin__grid">
+        <section class="cv-admin__panel no-print">
+          <div v-if="!variant" class="cv-admin__gate">
+            <h1 class="cv-admin__gate-title">No CVs yet</h1>
+            <p>Import a bundle to add CV variants.</p>
+            <label for="cv-import" class="a-btn a-btn--success">Import</label>
+          </div>
+          <template v-else>
+            <!-- Variant settings -->
+            <div class="cv-admin__variant">
+              <div class="d-flex gap-2 align-items-end flex-wrap">
+                <label class="flex-grow-1">
+                  <span class="cv-admin__label">CV</span>
+                  <select
+                    class="form-select form-select-sm"
+                    :value="variant.id"
+                    @change="onSwitchVariant"
+                  >
+                    <option
+                      v-for="v in state.variants"
+                      :key="v.id"
+                      :value="v.id"
+                    >
+                      {{ v.name
+                      }}{{
+                        v.id === state.published[v.layout] ? " (published)" : ""
+                      }}
+                    </option>
+                  </select>
+                </label>
+                <button class="a-btn" :disabled="busy" @click="duplicate">
+                  Duplicate
+                </button>
+              </div>
+              <div class="row g-2 mt-1">
+                <label class="col-6">
+                  <span class="cv-admin__label">Variant name</span>
+                  <input
+                    v-model="variant.name"
+                    class="form-control form-control-sm"
+                  />
+                </label>
+                <label class="col-6">
+                  <span class="cv-admin__label">CV headline</span>
+                  <input
+                    v-model="variant.title"
+                    class="form-control form-control-sm"
+                  />
+                </label>
+                <label class="col-12">
+                  <span class="cv-admin__label">Summary (HTML allowed)</span>
+                  <textarea
+                    v-model="variant.summary"
+                    rows="3"
+                    class="form-control form-control-sm"
+                  ></textarea>
+                </label>
+                <label class="col-6">
+                  <span class="cv-admin__label">Layout</span>
+                  <select
+                    class="form-select form-select-sm"
+                    :value="variant.layout ?? 'styled'"
+                    @change="
+                      variant.layout = ($event.target as HTMLSelectElement)
+                        .value as Variant['layout']
+                    "
+                  >
+                    <option value="styled">Styled (two columns)</option>
+                    <option value="ats">ATS (plain single column)</option>
+                  </select>
+                </label>
+                <label
+                  class="col-6 form-check d-flex align-items-end gap-1 ps-4 mb-0"
+                  title="Adds phone and location to this variant. Fine for a PDF, but they'd be public if this variant is published to the site."
+                >
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    :checked="!!variant.contact"
+                    @change="variant.contact = checked($event) || undefined"
+                  />
+                  <span class="small">Include phone &amp; location</span>
+                </label>
+              </div>
+              <div class="d-flex gap-2 mt-2 align-items-center flex-wrap">
+                <button
+                  class="a-btn a-btn--primary"
+                  :disabled="busy || !dirty"
+                  @click="save"
+                >
+                  Save
+                </button>
+                <button
+                  class="a-btn a-btn--success"
+                  :disabled="busy"
+                  @click="saveAndPublish"
+                >
+                  Save &amp; publish
+                </button>
+                <button
+                  class="a-btn"
+                  :disabled="busy || !dirty || !savedSnapshot"
+                  @click="revert"
+                >
+                  Revert
+                </button>
+                <button
+                  class="a-btn ms-auto"
+                  @click="showPreview = !showPreview"
+                >
+                  {{ showPreview ? "Hide preview" : "Show preview" }}
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-if="
+                variant.contact &&
+                variant.id === state.published[variant.layout ?? 'styled']
+              "
+              class="alert alert-warning py-1 px-2 small"
+            >
+              This variant is published with phone and location, so they are
+              visible on the public site.
+            </div>
+            <div
+              v-for="o in overflow"
+              :key="o.page"
+              class="alert alert-danger py-1 px-2 small"
+            >
+              Page {{ o.page }} overflows by about {{ o.mm }}mm. Move something
+              to another page or untick some bullets, or it will be cut off in
+              print.
+            </div>
+            <span v-if="previewError" class="small text-danger d-block mb-2">
+              {{ previewError }}
+            </span>
+
+            <!-- Layout: one ordered list of sections, cut into sheets by breaks -->
+            <div>
+              <p class="small text-muted">
+                <strong
+                  >Layout · {{ placement.size }} entries on this CV.</strong
+                >
+                Tick what it prints: entries, their bullets, and a job's client
+                engagements (untick a client and tick its bullets to print them
+                under the job instead). Full / Condensed on a row switches
+                between all of its bullets and the condensed ones written for
+                this CV in the Library. Dimmed rows aren't on this CV yet. Most
+                important first; page breaks cut the list into printed sheets,
+                and a section that continues repeats its heading.
+              </p>
+              <div class="d-flex gap-2 mb-2 small">
+                <button class="cv-admin__link" @click="collapseAll(true)">
+                  Collapse all
+                </button>
+                <button class="cv-admin__link" @click="collapseAll(false)">
+                  Expand all
+                </button>
+              </div>
+
+              <!-- Styled layout: sidebar and main side by side, as on the CV -->
+              <template v-if="twoColumn">
+                <template v-for="(group, g) in layoutGroups" :key="g">
+                  <div
+                    v-if="group.breakIndex !== undefined"
+                    class="cv-admin__break"
+                  >
+                    <span class="flex-grow-1">— page break —</span>
+                    <button
+                      class="a-btn a-btn--icon"
+                      title="Remove break"
+                      @click="removeSectionBreak(group.breakIndex)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div class="cv-admin__columns">
+                    <div class="cv-admin__column is-sidebar">
+                      <div class="cv-admin__column-title">Sidebar</div>
+                      <VariantSectionEditor
+                        v-for="i in group.sidebar"
+                        :key="i"
+                        v-bind="sectionBind(i)"
+                        :can-up="columnTarget(i, -1) >= 0"
+                        :can-down="columnTarget(i, 1) >= 0"
+                        v-on="sectionOn(i)"
+                        @move="moveInColumn(i, $event)"
+                      />
+                      <template v-if="g === layoutGroups.length - 1">
+                        <VariantSectionEditor
+                          v-for="section in absentSections.filter(isSidebar)"
+                          :key="section"
+                          v-bind="sectionBind(-1, section)"
+                          :can-up="false"
+                          :can-down="false"
+                          v-on="sectionOn(-1, section)"
+                        />
+                      </template>
+                      <p
+                        v-if="
+                          !group.sidebar.length && g < layoutGroups.length - 1
+                        "
+                        class="small text-muted"
+                      >
+                        Nothing here
+                      </p>
+                    </div>
+                    <div class="cv-admin__column">
+                      <div class="cv-admin__column-title">Main</div>
+                      <VariantSectionEditor
+                        v-for="i in group.main"
+                        :key="i"
+                        v-bind="sectionBind(i)"
+                        :can-up="columnTarget(i, -1) >= 0"
+                        :can-down="columnTarget(i, 1) >= 0"
+                        v-on="sectionOn(i)"
+                        @move="moveInColumn(i, $event)"
+                      />
+                      <template v-if="g === layoutGroups.length - 1">
+                        <VariantSectionEditor
+                          v-for="section in absentSections.filter(
+                            (s) => !isSidebar(s)
+                          )"
+                          :key="section"
+                          v-bind="sectionBind(-1, section)"
+                          :can-up="false"
+                          :can-down="false"
+                          v-on="sectionOn(-1, section)"
+                        />
+                      </template>
+                      <p
+                        v-if="!group.main.length && g < layoutGroups.length - 1"
+                        class="small text-muted"
+                      >
+                        Nothing here
+                      </p>
+                    </div>
+                  </div>
+                </template>
+              </template>
+
+              <!-- ATS layout: one column, in reading order -->
+              <template v-else>
+                <template v-for="(item, i) in variant.sections" :key="i">
+                  <div v-if="isBreak(item)" class="cv-admin__break">
+                    <span class="flex-grow-1">— page break —</span>
+                    <button
+                      class="a-btn a-btn--icon"
+                      title="Move up"
+                      :disabled="i === 0"
+                      @click="moveSection(i, -1)"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      class="a-btn a-btn--icon"
+                      title="Move down"
+                      :disabled="i === variant.sections.length - 1"
+                      @click="moveSection(i, 1)"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      class="a-btn a-btn--icon"
+                      title="Remove break"
+                      @click="removeSectionBreak(i)"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <VariantSectionEditor
+                    v-else
+                    v-bind="sectionBind(i)"
+                    :can-up="i > 0"
+                    :can-down="i < variant.sections.length - 1"
+                    v-on="sectionOn(i)"
+                    @move="moveSection(i, $event)"
+                  />
+                </template>
+                <VariantSectionEditor
+                  v-for="section in absentSections"
+                  :key="section"
+                  v-bind="sectionBind(-1, section)"
+                  :can-up="false"
+                  :can-down="false"
+                  v-on="sectionOn(-1, section)"
+                />
+              </template>
+            </div>
+          </template>
+        </section>
+
+        <!-- Preview: rendered even while hidden, so overflow is still measured
+           and printing works. -->
+        <section
+          v-if="variant"
+          class="cv-admin__preview"
+          :class="{ 'is-hidden': !showPreview }"
+          :style="{ width: previewWidth }"
+        >
+          <div class="d-flex gap-2 align-items-center mb-2 no-print">
+            <strong class="small text-dark">Preview</strong>
+            <select
+              v-model.number="zoom"
+              class="form-select form-select-sm w-auto"
+            >
+              <option :value="0.5">50%</option>
+              <option :value="0.6">60%</option>
+              <option :value="0.75">75%</option>
+              <option :value="1">100%</option>
+            </select>
+            <button class="a-btn" @click="printCv">Print / save PDF</button>
+            <label
+              v-if="(variant.layout ?? 'styled') === 'styled'"
+              class="form-check small mb-0 ms-1"
+            >
+              <input v-model="paged" type="checkbox" class="form-check-input" />
+              A4 pages
+            </label>
+          </div>
+          <div ref="previewEl" class="cv-admin__zoom" :style="{ zoom }">
+            <template v-if="preview.length">
+              <CvAtsDocument v-if="variant.layout === 'ats'" :pages="preview" />
+              <CvDocument
+                v-else
+                :pages="preview"
+                :paged="paged || !showPreview"
+              />
+            </template>
+          </div>
+        </section>
+      </div>
+    </template>
 
     <!-- Profile editor -->
     <div
@@ -1213,6 +1263,7 @@ onBeforeRouteLeave(
           :usage="editor.entry ? state.usage[editor.entry.id] : undefined"
           :timeline-kinds="state.timelineKinds"
           :jobs="jobs"
+          :variants="state.variants"
           :busy="busy"
           @save="saveEntry"
           @delete="deleteEntry"
@@ -1449,7 +1500,7 @@ onBeforeRouteLeave(
   margin-bottom: 0.75rem;
   border-bottom: 1px solid var(--ad-line);
 
-  button {
+  > button {
     border: none;
     background: none;
     padding: 0.4rem 0.75rem;
@@ -1461,6 +1512,47 @@ onBeforeRouteLeave(
       border-bottom-color: var(--ad-accent);
     }
   }
+}
+
+// The workspace switcher: the two big tabs, then the status line and the
+// account controls on the right.
+.cv-admin__switch {
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  margin-bottom: 1rem;
+
+  > button {
+    font-family: var(--ad-label-font);
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    margin-bottom: -1px;
+  }
+}
+
+.cv-admin__count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--ad-tag-bg);
+  color: var(--ad-muted-2);
+  vertical-align: middle;
+}
+
+.cv-admin__badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--ad-rollup-bg);
+  color: var(--ad-rollup-text);
+  vertical-align: middle;
+}
+
+.cv-admin__panel--library {
+  max-height: none;
 }
 
 .cv-admin__break {
