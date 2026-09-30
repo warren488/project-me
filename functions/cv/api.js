@@ -12,6 +12,7 @@ const {
   checkEngagements,
   refId,
   engagementPick,
+  highlightsFor,
   formatRange,
   SECTION_KINDS,
   SIDEBAR_SECTIONS,
@@ -66,11 +67,16 @@ function readBody(req) {
 function usage(library, variants) {
   const byId = new Map(library.entries.map((e) => [e.id, e]));
   const map = {};
-  const record = (variantId, entry, bulletIds) => {
+  // A condensed pick counts as using the highlights it resolves to.
+  const record = (variantId, entry, bulletIds, condensed) => {
     const use =
       map[entry.id] || (map[entry.id] = { variants: [], bullets: {} });
     if (!use.variants.includes(variantId)) use.variants.push(variantId);
-    const ids = bulletIds || (entry.bullets || []).map((b) => b.id);
+    const ids =
+      bulletIds ||
+      (condensed
+        ? highlightsFor(entry, variantId).map((h) => h.id)
+        : (entry.bullets || []).map((b) => b.id));
     for (const b of ids) {
       (use.bullets[b] || (use.bullets[b] = [])).push(variantId);
     }
@@ -79,7 +85,12 @@ function usage(library, variants) {
     eachRef(variant, (ref) => {
       const id = refId(ref);
       const entry = byId.get(id) || { id };
-      record(variant.id, entry, typeof ref !== "string" ? ref.bullets : null);
+      record(
+        variant.id,
+        entry,
+        typeof ref !== "string" ? ref.bullets : null,
+        typeof ref !== "string" && !!ref.condensed
+      );
       // Engagements ride along with their job: shown, rolled up, or at least
       // configured in the ref.
       if (entry.kind !== "job") return;
@@ -92,7 +103,7 @@ function usage(library, variants) {
       for (const eng of engagementsOf(library, id)) {
         const pick = engagementPick(ref, eng.id);
         if (pick.show || (pick.bullets && pick.bullets.length) || picks[eng.id])
-          record(variant.id, eng, pick.bullets);
+          record(variant.id, eng, pick.bullets, !!pick.condensed);
       }
     });
   }
@@ -199,6 +210,9 @@ function cleanEntry(input) {
       const text = optionalString(h, "text");
       if (!text) throw new Error(`Highlight "${highlightId}" has no text`);
       const highlight = { id: highlightId, text };
+      // The CV it was written for; absent = general.
+      const forId = optionalString(h, "for");
+      if (forId) highlight.for = checkId(forId, `highlight "${highlightId}" for`);
       if (h.from !== undefined && h.from !== null) {
         if (!Array.isArray(h.from) || h.from.some((f) => typeof f !== "string"))
           throw new Error(`Highlight "${highlightId}": "from" must be a list`);
@@ -447,18 +461,19 @@ function createHandler({ store, authorize, prefix = "", provider }) {
         ? library.entries.find((e) => e.id === entry.parent)
         : undefined;
     for (const e of [entry, job]) if (e) e.displayDates = formatRange(e);
-    const audience =
-      input.audience && typeof input.audience === "object"
-        ? {
-            title: String(input.audience.title || ""),
-            summary: String(input.audience.summary || ""),
-          }
-        : undefined;
+    // The CV the highlights are for gives the audience; none = general.
+    let audience;
+    const forId = optionalString(input, "for");
+    if (forId) {
+      const variant = await store.readVariant(checkId(forId, "variant id"));
+      audience = { title: variant.title || "", summary: variant.summary || "" };
+    }
     const prompt = buildPrompt({ entry, job, audience, count: input.count });
     const out = {
       prompt: { system: prompt.system, user: prompt.user },
       ids: prompt.ids,
       count: prompt.count,
+      for: forId || "",
     };
     if (!input.run) return { status: 200, body: out };
     const ai = provider ? provider() : null;

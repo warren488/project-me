@@ -103,7 +103,8 @@ const refId = (ref) => (typeof ref === "string" ? ref : ref.id);
 // deviations keyed by engagement id: { show?: boolean, bullets?: string[] }.
 // An engagement with show: false and a bullet list is hidden as a block, and
 // those bullets print under the job's own bullets instead ("rolled up").
-// Returns { show, bullets } where bullets undefined means "all of them".
+// Returns { show, bullets, condensed } where bullets undefined means "all of
+// them" and condensed means "the entry's condensed highlights for this CV".
 function engagementPick(ref, engagementId, where) {
   const setting = typeof ref === "string" ? undefined : ref.engagements;
   if (setting === undefined || setting === true) return { show: true };
@@ -124,8 +125,21 @@ function engagementPick(ref, engagementId, where) {
   if (pick.bullets !== undefined && !Array.isArray(pick.bullets)) {
     throw new Error(`${where || "ref"}: "bullets" must be a list`);
   }
+  if (pick.condensed !== undefined && typeof pick.condensed !== "boolean") {
+    throw new Error(`${where || "ref"}: "condensed" must be a boolean`);
+  }
   const show = pick.show !== false;
-  return { show, bullets: pick.bullets || (show ? undefined : []) };
+  const out = { show, bullets: pick.bullets || (show ? undefined : []) };
+  if (pick.condensed) out.condensed = true;
+  return out;
+}
+
+// The condensed highlights an entry prints on a CV: the ones written for
+// that CV, else the general ones (no `for`).
+function highlightsFor(entry, variantId) {
+  const all = entry.highlights || [];
+  const own = all.filter((h) => h.for === variantId);
+  return own.length ? own : all.filter((h) => !h.for);
 }
 
 // Calls fn(ref, sectionName) for every entry reference in a variant.
@@ -167,11 +181,16 @@ function resolveVariant(library, variant) {
     return { entry, ref };
   };
 
-  // The texts of the listed ids, in that order; all the bullets if none are
-  // listed. Listed ids may name condensed highlights too, but those are never
-  // part of the default.
-  const pickBullets = (entry, ids) => {
+  // The texts of the listed ids, in that order; with `condensed`, the
+  // entry's highlights for this CV (falling back to the full bullets when it
+  // has none); all the bullets if neither. Listed ids may name highlights
+  // too, but those are never part of the default.
+  const pickBullets = (entry, ids, condensed) => {
     const bullets = entry.bullets || [];
+    if (condensed && !ids) {
+      const set = highlightsFor(entry, variant.id);
+      return (set.length ? set : bullets).map((b) => b.text);
+    }
     if (!ids) return bullets.map((b) => b.text);
     const known = [...bullets, ...(entry.highlights || [])];
     return ids.map((bulletId) => {
@@ -286,13 +305,21 @@ function resolveVariant(library, variant) {
         }
       } else if (section === "experience") {
         out.experience = items(section).map(({ entry, ref }) => {
+          if (
+            typeof ref !== "string" &&
+            ref.condensed !== undefined &&
+            typeof ref.condensed !== "boolean"
+          ) {
+            throw new Error(`${where}: "condensed" must be a boolean`);
+          }
           const job = {
             title: entry.title,
             company: entry.org,
             dates: formatRange(entry),
             details: pickBullets(
               entry,
-              typeof ref === "string" ? undefined : ref.bullets
+              typeof ref === "string" ? undefined : ref.bullets,
+              typeof ref !== "string" && ref.condensed
             ),
           };
           const own = engagementsOf(entry);
@@ -312,8 +339,11 @@ function resolveVariant(library, variant) {
               engagements.push({
                 client: eng.title,
                 dates: formatRange(eng),
-                details: pickBullets(eng, pick.bullets),
+                details: pickBullets(eng, pick.bullets, pick.condensed),
               });
+            } else if (pick.condensed) {
+              // Hidden block, condensed: its highlights roll up under the job.
+              job.details.push(...pickBullets(eng, undefined, true));
             } else if (pick.bullets && pick.bullets.length) {
               job.details.push(...pickBullets(eng, pick.bullets));
             }
@@ -506,6 +536,7 @@ module.exports = {
   isBreak,
   refId,
   engagementPick,
+  highlightsFor,
   resolveProjects,
   publishProjects,
   publishSiteData,

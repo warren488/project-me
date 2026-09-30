@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { LibraryEntry, VariantRef } from "@/cv/types";
+import type { LibraryEntry, PickMode, VariantRef } from "@/cv/types";
 import {
   engagementBullets,
+  engagementMode,
   engagementPick,
+  highlightsFor,
   moveInList,
-  ownBullets,
+  ownBulletsFor,
+  pickMode,
   plain,
   withBullets,
+  withCondensed,
   withEngagement,
 } from "@/cv/refs";
 
-// One library entry in the Layout tab, as a small tree: the entry, its
+// One library entry in the CVs workspace, as a small tree: the entry, its
 // bullets, and (for jobs) its client engagements with their bullets. Every
 // row is one line. `value` is the entry's ref in the variant, or null when
 // the entry isn't on this CV yet (rendered dimmed, so it can be ticked).
+// Each entry and engagement prints Full (all bullets), Condensed (its
+// highlights written for this CV) or Custom (a ticked list).
 const props = defineProps<{
   entry: LibraryEntry;
   value: VariantRef | null;
@@ -25,6 +31,8 @@ const props = defineProps<{
   canDown: boolean;
   sheet?: number;
   absent?: boolean; // the section itself isn't in the variant yet
+  variantId: string; // the CV being edited
+  variantNames: Map<string, string>; // for the highlight labels
 }>();
 
 const emit = defineEmits<{
@@ -33,17 +41,29 @@ const emit = defineEmits<{
   (e: "move", by: number): void;
   (e: "break-after"): void;
   (e: "expand", id: string): void;
-  (e: "condense", entry: LibraryEntry): void;
 }>();
 
 // A tickable line: a full bullet, or a condensed highlight (marked so).
-type Row = { id: string; text: string; condensed: boolean };
+type Row = { id: string; text: string; condensed: boolean; for?: string };
 const rowsOf = (entry: LibraryEntry): Row[] => [
   ...(entry.bullets ?? []).map((b) => ({ ...b, condensed: false })),
   ...(entry.highlights ?? []).map((h) => ({ ...h, condensed: true })),
 ];
 const hasRows = (entry: LibraryEntry) =>
   !!(entry.bullets?.length || entry.highlights?.length);
+// Whether the entry has condensed highlights that apply to this CV.
+const canCondense = (entry: LibraryEntry) =>
+  highlightsFor(entry, props.variantId).length > 0;
+const condensedTitle = (entry: LibraryEntry) =>
+  canCondense(entry)
+    ? "Print the condensed highlights written for this CV"
+    : "No condensed bullets for this CV yet. Write them in the Library.";
+const rowTag = (row: Row) =>
+  !row.condensed
+    ? ""
+    : `condensed · ${
+        row.for ? (props.variantNames.get(row.for) ?? row.for) : "general"
+      }`;
 
 const selected = computed(() => props.value !== null);
 const bullets = computed(() => props.entry.bullets ?? []);
@@ -57,20 +77,27 @@ const open = computed(
 const ref = () => props.value as VariantRef;
 const checked = (event: Event) => (event.target as HTMLInputElement).checked;
 
-// --- The entry's own bullets ---
-const ownIds = computed(() =>
-  selected.value ? ownBullets(props.entry, ref()) : []
-);
-// Selected ones in print order, then the rest in library order.
-const ownRows = computed((): Row[] => {
-  const all = rowsOf(props.entry);
-  const chosen = new Set(ownIds.value);
+// Selected ids in print order, then the rest in library order. In condensed
+// mode only the resolved set is listed.
+const rowsFor = (entry: LibraryEntry, ids: string[], mode: PickMode) => {
+  const all = rowsOf(entry);
   const byId = new Map(all.map((r) => [r.id, r]));
-  return [
-    ...ownIds.value.map((id) => byId.get(id)).filter((r): r is Row => !!r),
-    ...all.filter((r) => !chosen.has(r.id)),
-  ];
-});
+  const chosen = ids.map((id) => byId.get(id)).filter((r): r is Row => !!r);
+  if (mode === "condensed") return chosen;
+  const picked = new Set(ids);
+  return [...chosen, ...all.filter((r) => !picked.has(r.id))];
+};
+
+// --- The entry's own bullets ---
+const ownMode = computed((): PickMode =>
+  selected.value ? pickMode(ref()) : "full"
+);
+const ownIds = computed(() =>
+  selected.value ? ownBulletsFor(props.entry, ref(), props.variantId) : []
+);
+const ownRows = computed(() =>
+  rowsFor(props.entry, ownIds.value, ownMode.value)
+);
 function setOwn(ids: string[]) {
   emit("update", withBullets(props.entry, ref(), ids));
 }
@@ -78,26 +105,31 @@ function toggleOwn(id: string, on: boolean) {
   const ids = ownIds.value.filter((b) => b !== id);
   setOwn(on ? [...ids, id] : ids);
 }
+function setOwnMode(mode: PickMode) {
+  emit("update", withCondensed(props.entry, ref(), mode === "condensed"));
+}
 
 // --- Engagements ---
 const pickOf = (eng: LibraryEntry) => engagementPick(ref(), eng.id);
-const engIds = (eng: LibraryEntry) => engagementBullets(eng, ref());
-const engRows = (eng: LibraryEntry): Row[] => {
-  const ids = engIds(eng);
-  const chosen = new Set(ids);
-  const all = rowsOf(eng);
-  const byId = new Map(all.map((r) => [r.id, r]));
-  return [
-    ...ids.map((id) => byId.get(id)).filter((r): r is Row => !!r),
-    ...all.filter((r) => !chosen.has(r.id)),
-  ];
-};
+const engMode = (eng: LibraryEntry) => engagementMode(ref(), eng.id);
+const engIds = (eng: LibraryEntry) =>
+  engagementBullets(eng, ref(), props.variantId);
+const engRows = (eng: LibraryEntry) => rowsFor(eng, engIds(eng), engMode(eng));
 function setEngagement(eng: LibraryEntry, show: boolean, ids?: string[]) {
   emit(
     "update",
     withEngagement(props.entry, ref(), props.engagements, eng, {
       show,
       bullets: ids,
+    })
+  );
+}
+function setEngMode(eng: LibraryEntry, mode: PickMode) {
+  emit(
+    "update",
+    withEngagement(props.entry, ref(), props.engagements, eng, {
+      show: pickOf(eng).show,
+      condensed: mode === "condensed",
     })
   );
 }
@@ -119,20 +151,18 @@ const title = computed(() =>
     ? `${props.entry.title} · ${props.entry.org}`
     : props.entry.title
 );
-// "2/5 bullets", "3 condensed", or "3 condensed + 1/5 bullets".
-const pickLabel = (entry: LibraryEntry, ids: string[]) => {
-  const highlights = new Set((entry.highlights ?? []).map((h) => h.id));
-  const condensed = ids.filter((id) => highlights.has(id)).length;
-  const full = ids.length - condensed;
-  const total = (entry.bullets ?? []).length;
-  if (!condensed)
-    return total && full !== total ? `${full}/${total} bullets` : "";
-  return `${condensed} condensed${full ? ` + ${full}/${total} bullets` : ""}`;
+// "condensed", "condensed · none, printing full", or "custom 2/5".
+const pickLabel = (entry: LibraryEntry, ids: string[], mode: PickMode) => {
+  if (mode === "condensed")
+    return ids.length ? "condensed" : "condensed · none, printing full";
+  if (mode === "custom") return `custom · ${ids.length} ticked`;
+  return "";
 };
+const isWarning = (label: string) => label.includes("none");
 const meta = computed(() => {
   if (!selected.value) return [];
   const out: string[] = [];
-  const own = pickLabel(props.entry, ownIds.value);
+  const own = pickLabel(props.entry, ownIds.value, ownMode.value);
   if (own) out.push(own);
   if (props.engagements.length) {
     const shown = props.engagements.filter((e) => pickOf(e).show).length;
@@ -148,7 +178,7 @@ const engMeta = (eng: LibraryEntry) => {
   const pick = pickOf(eng);
   const n = engIds(eng).length;
   if (!pick.show) return n ? `${n} rolled up` : "hidden";
-  return pickLabel(eng, engIds(eng));
+  return pickLabel(eng, engIds(eng), engMode(eng));
 };
 </script>
 
@@ -177,10 +207,40 @@ const engMeta = (eng: LibraryEntry) => {
       <span class="ler__label" :title="title" @click="emit('expand', entry.id)">
         {{ title }}
       </span>
-      <span v-for="m in meta" :key="m" class="ler__tag">{{ m }}</span>
+      <span
+        v-for="m in meta"
+        :key="m"
+        class="ler__tag"
+        :class="{ 'is-warning': isWarning(m) }"
+        >{{ m }}</span
+      >
       <span v-if="sheet" class="ler__tag" title="Printed sheet"
         >p{{ sheet }}</span
       >
+      <span
+        v-if="selected && !absent && bullets.length"
+        class="ler__switch"
+        role="group"
+        aria-label="Which bullets print"
+      >
+        <button
+          type="button"
+          :class="{ 'is-on': ownMode === 'full' }"
+          title="Print all of its bullets"
+          @click="setOwnMode('full')"
+        >
+          Full
+        </button>
+        <button
+          type="button"
+          :class="{ 'is-on': ownMode === 'condensed' }"
+          :disabled="!canCondense(entry)"
+          :title="condensedTitle(entry)"
+          @click="setOwnMode('condensed')"
+        >
+          Condensed
+        </button>
+      </span>
       <template v-if="selected && manual">
         <button
           type="button"
@@ -210,15 +270,6 @@ const engMeta = (eng: LibraryEntry) => {
       >
         ⤓
       </button>
-      <button
-        v-if="selected && !absent && bullets.length"
-        type="button"
-        class="a-btn a-btn--icon"
-        title="Condense these bullets into a few highlights"
-        @click="emit('condense', entry)"
-      >
-        ✦
-      </button>
     </div>
 
     <template v-if="open">
@@ -241,11 +292,11 @@ const engMeta = (eng: LibraryEntry) => {
         <span
           v-if="b.condensed"
           class="ler__tag is-condensed"
-          title="A condensed highlight: prints only when ticked"
+          title="A condensed highlight, and the CV it was written for"
         >
-          condensed
+          {{ rowTag(b) }}
         </span>
-        <template v-if="ownIds.includes(b.id)">
+        <template v-if="ownIds.includes(b.id) && ownMode !== 'condensed'">
           <button
             type="button"
             class="a-btn a-btn--icon"
@@ -301,16 +352,36 @@ const engMeta = (eng: LibraryEntry) => {
               · {{ eng.displayDates }}</span
             >
           </span>
-          <span v-if="engMeta(eng)" class="ler__tag">{{ engMeta(eng) }}</span>
-          <button
-            v-if="!absent && eng.bullets?.length"
-            type="button"
-            class="a-btn a-btn--icon"
-            title="Condense this client's bullets into a few highlights"
-            @click="emit('condense', eng)"
+          <span
+            v-if="engMeta(eng)"
+            class="ler__tag"
+            :class="{ 'is-warning': isWarning(engMeta(eng)) }"
+            >{{ engMeta(eng) }}</span
           >
-            ✦
-          </button>
+          <span
+            v-if="!absent && eng.bullets?.length"
+            class="ler__switch"
+            role="group"
+            aria-label="Which bullets print"
+          >
+            <button
+              type="button"
+              :class="{ 'is-on': engMode(eng) === 'full' }"
+              title="Print all of its bullets"
+              @click="setEngMode(eng, 'full')"
+            >
+              Full
+            </button>
+            <button
+              type="button"
+              :class="{ 'is-on': engMode(eng) === 'condensed' }"
+              :disabled="!canCondense(eng)"
+              :title="condensedTitle(eng)"
+              @click="setEngMode(eng, 'condensed')"
+            >
+              Condensed
+            </button>
+          </span>
         </div>
         <template v-if="expanded.has(eng.id)">
           <div
@@ -336,9 +407,9 @@ const engMeta = (eng: LibraryEntry) => {
             <span
               v-if="b.condensed"
               class="ler__tag is-condensed"
-              title="A condensed highlight: prints only when ticked"
+              title="A condensed highlight, and the CV it was written for"
             >
-              condensed
+              {{ rowTag(b) }}
             </span>
             <span
               v-if="!pickOf(eng).show && engIds(eng).includes(b.id)"
@@ -347,7 +418,9 @@ const engMeta = (eng: LibraryEntry) => {
             >
               → job
             </span>
-            <template v-if="engIds(eng).includes(b.id)">
+            <template
+              v-if="engIds(eng).includes(b.id) && engMode(eng) !== 'condensed'"
+            >
               <button
                 type="button"
                 class="a-btn a-btn--icon"
@@ -454,6 +527,36 @@ const engMeta = (eng: LibraryEntry) => {
   &.is-condensed {
     background: var(--ad-on-bg);
     color: var(--ad-on-text);
+  }
+  &.is-warning {
+    background: var(--ad-rollup-bg);
+    color: var(--ad-rollup-text);
+  }
+}
+
+// Full | Condensed: a two-button switch, the active side filled.
+.ler__switch {
+  flex-shrink: 0;
+  display: inline-flex;
+  border: 1px solid var(--ad-line-strong);
+  border-radius: 999px;
+  overflow: hidden;
+
+  button {
+    border: none;
+    background: var(--ad-bg);
+    color: var(--ad-muted-2);
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+    line-height: 1.5;
+
+    &.is-on {
+      background: var(--ad-on-bg);
+      color: var(--ad-on-text);
+    }
+    &:disabled {
+      opacity: 0.45;
+    }
   }
 }
 

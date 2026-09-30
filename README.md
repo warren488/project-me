@@ -54,12 +54,16 @@ NUXT_PUBLIC_AUTH_EMULATOR=http://127.0.0.1:9099 npm run dev
 
 ### Condensing bullets
 
-The ✦ button on a job or client in the Layout tab turns its bullets into a
-few "condensed" highlights with a model's help. Highlights are stored on the
-entry next to its bullets (editable in the entry editor), never appear on
-the timeline, and print only where a CV picks them; accepting them makes them
-the pick on the current CV. The prompt is always built by the function, and
-the dialog offers three ways to run it:
+The dashboard has two workspaces: **Library** (the content) and **CVs**
+(what each CV prints). In the Library, a job or client engagement's editor
+has a Condensed section with one group per CV: "✦ Condense…" turns the
+saved bullets into a few highlights written for that CV with a model's help
+(the CV's headline and summary are the audience), and each CV can hold its
+own set. Highlights never appear on the timeline. Under CVs, every job and
+client row has a **Full / Condensed** switch: Condensed prints the
+highlights written for that CV (or the general ones), Full prints all the
+bullets, and ticking rows by hand gives a Custom pick. The prompt is always
+built by the function, and the dialog offers three ways to run it:
 
 - **Server**: the provider set in `functions/.env` (`AI_PROVIDER` is
   `anthropic`, or `openai` for any OpenAI-compatible endpoint such as OpenAI,

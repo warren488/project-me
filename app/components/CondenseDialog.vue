@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { api, ApiError } from "@/cv/api";
-import type { Highlight, LibraryEntry, Variant } from "@/cv/types";
+import type { Highlight, LibraryEntry } from "@/cv/types";
 import { plain } from "@/cv/refs";
 import {
   completeLocally,
@@ -15,19 +15,22 @@ import {
   type Proposal,
 } from "@/cv/condense";
 
-// Turns an entry's bullets into a few highlights with a model's help, then
-// lets the user edit and accept them. The prompt always comes from the
-// server; where it runs is the user's choice: the server's provider, a local
-// model called from here, or a chat tool by hand (copy, paste the reply).
+// Turns an entry's bullets into a few highlights for one CV with a model's
+// help, then lets the user edit and accept them. The prompt always comes
+// from the server (which reads the CV for the audience); where it runs is
+// the user's choice: the server's provider, a local model called from here,
+// or a chat tool by hand (copy, paste the reply). Accepting hands the
+// highlights back to the entry editor; nothing is saved here.
 const props = defineProps<{
-  entry: LibraryEntry; // a job or an engagement with bullets
-  job?: LibraryEntry; // the parent job when entry is an engagement
-  variant: Variant | null; // the CV the highlights are for
-  busy: boolean; // the page is saving
+  entry: LibraryEntry; // a saved job or engagement with bullets
+  variants: { id: string; name: string }[]; // the CVs to write for
+  initialFor: string; // variant id, or "" for general
+  existing: Highlight[]; // the entry's current highlights (unsaved form)
+  takenIds: string[]; // every id in use on the entry, for new ids
 }>();
 
 const emit = defineEmits<{
-  (e: "accept", highlights: Highlight[], use: boolean): void;
+  (e: "accept", highlights: Highlight[], forId: string, replace: boolean): void;
   (e: "cancel"): void;
 }>();
 
@@ -51,6 +54,7 @@ const MODES: { value: CondenseMode; label: string; hint: string }[] = [
 
 const settings = reactive(loadSettings());
 watch(settings, (s) => saveSettings({ ...s }));
+const forId = ref(props.initialFor);
 
 const loading = ref(false);
 const error = ref("");
@@ -59,7 +63,7 @@ const ran = ref<{ name: string; model: string } | null>(null);
 const reply = ref(""); // pasted reply (paste mode)
 const copied = ref(false);
 const showPrompt = ref(false);
-const use = ref(true);
+const replace = ref(true);
 
 interface Draft extends Proposal {
   on: boolean;
@@ -67,14 +71,16 @@ interface Draft extends Proposal {
 const drafts = ref<Draft[]>([]);
 
 const title = computed(() =>
-  props.job
-    ? `${props.entry.title} · ${props.job.title}`
-    : `${props.entry.title}${props.entry.org ? ` · ${props.entry.org}` : ""}`
+  props.entry.org
+    ? `${props.entry.title} · ${props.entry.org}`
+    : props.entry.title
 );
-const audience = computed(() => ({
-  title: props.variant?.title ?? "",
-  summary: plain(props.variant?.summary ?? ""),
-}));
+const forName = computed(
+  () => props.variants.find((v) => v.id === forId.value)?.name ?? "General"
+);
+const existingFor = computed(() =>
+  props.existing.filter((h) => (h.for ?? "") === forId.value)
+);
 const sourceText = (from: string[]) =>
   from
     .map((id) => props.entry.bullets?.find((b) => b.id === id))
@@ -89,7 +95,13 @@ function setProposals(list: Proposal[]) {
   drafts.value = list.map((p) => ({ ...p, on: true }));
 }
 
-// Fetches the prompt (and, in server mode, the proposals).
+const body = (run: boolean) => ({
+  for: forId.value,
+  count: settings.count,
+  run,
+});
+
+// Fetches the prompt and, unless the user copies it by hand, runs it.
 async function load() {
   loading.value = true;
   error.value = "";
@@ -99,7 +111,7 @@ async function load() {
     response.value = await api<CondenseResponse>(
       `condense/${props.entry.id}`,
       "POST",
-      { audience: audience.value, count: settings.count, run }
+      body(run)
     );
     if (run) {
       setProposals(response.value.proposals ?? []);
@@ -121,17 +133,27 @@ async function load() {
   }
 }
 
+// The prompt alone, without a model run. Cheap, so it tracks the count and
+// the CV as they change: what is shown or copied is always current.
+let promptTimer: number | undefined;
+let promptSeq = 0;
 async function fetchPromptOnly() {
+  const seq = ++promptSeq;
   try {
-    response.value = await api<CondenseResponse>(
+    const next = await api<CondenseResponse>(
       `condense/${props.entry.id}`,
       "POST",
-      { audience: audience.value, count: settings.count, run: false }
+      body(false)
     );
+    if (seq === promptSeq) response.value = next;
   } catch (err) {
-    error.value = (err as Error).message;
+    if (seq === promptSeq) error.value = (err as Error).message;
   }
 }
+watch([forId, () => settings.count], () => {
+  window.clearTimeout(promptTimer);
+  promptTimer = window.setTimeout(fetchPromptOnly, 300);
+});
 
 async function runLocally() {
   if (!response.value) return;
@@ -183,11 +205,16 @@ function parseReply() {
 }
 
 function accept() {
+  const doReplace = replace.value && existingFor.value.length > 0;
+  // Ids being replaced are free again.
+  const dropping = new Set(doReplace ? existingFor.value.map((h) => h.id) : []);
   const highlights = toHighlights(
     props.entry,
-    accepted.value.map((d) => ({ text: d.text.trim(), from: d.from }))
+    accepted.value.map((d) => ({ text: d.text.trim(), from: d.from })),
+    forId.value,
+    props.takenIds.filter((id) => !dropping.has(id))
   );
-  emit("accept", highlights, use.value);
+  emit("accept", highlights, forId.value, doReplace);
 }
 
 onMounted(load);
@@ -195,27 +222,24 @@ onMounted(load);
 
 <template>
   <div class="condense">
-    <div class="d-flex align-items-center gap-2 mb-1">
-      <h5 class="mb-0 flex-grow-1">Condense {{ title }}</h5>
-      <span v-if="variant" class="small text-muted"
-        >for {{ variant.name }}</span
-      >
-    </div>
+    <h5 class="mb-1">Condense {{ title }}</h5>
     <p class="small text-muted mb-2">
-      {{ entry.bullets?.length ?? 0 }} bullets in, a few highlights out. They
-      are saved to the library and print only where a CV picks them.
+      {{ entry.bullets?.length ?? 0 }} bullets in, a few highlights out, written
+      for one CV. They go into the entry's Condensed section; save the entry to
+      keep them.
     </p>
 
     <div class="row g-2 align-items-end">
-      <label class="col-5">
-        <span class="condense__label">Run it with</span>
-        <select v-model="settings.mode" class="form-select form-select-sm">
-          <option v-for="m in MODES" :key="m.value" :value="m.value">
-            {{ m.label }}
+      <label class="col-4">
+        <span class="condense__label">For</span>
+        <select v-model="forId" class="form-select form-select-sm">
+          <option v-for="v in variants" :key="v.id" :value="v.id">
+            {{ v.name }}
           </option>
+          <option value="">General (any CV)</option>
         </select>
       </label>
-      <label class="col-3">
+      <label class="col-2">
         <span class="condense__label">Bullets</span>
         <input
           v-model.number="settings.count"
@@ -225,11 +249,19 @@ onMounted(load);
           class="form-control form-control-sm"
         />
       </label>
-      <div class="col-4">
+      <label class="col-3">
+        <span class="condense__label">Run it with</span>
+        <select v-model="settings.mode" class="form-select form-select-sm">
+          <option v-for="m in MODES" :key="m.value" :value="m.value">
+            {{ m.label }}
+          </option>
+        </select>
+      </label>
+      <div class="col-3">
         <button
           type="button"
           class="a-btn w-100"
-          :disabled="loading || busy"
+          :disabled="loading"
           @click="load"
         >
           {{ drafts.length ? "Run again" : "Run" }}
@@ -313,7 +345,7 @@ onMounted(load);
     <div v-if="drafts.length" class="mt-3">
       <div class="d-flex align-items-center mb-1">
         <span class="condense__label mb-0 flex-grow-1">
-          Proposals
+          Proposals for {{ forName }}
           <span v-if="ran" class="text-muted fw-normal text-lowercase">
             · {{ ran.name }}{{ ran.model ? ` ${ran.model}` : "" }}
           </span>
@@ -341,12 +373,12 @@ onMounted(load);
         </div>
       </div>
       <label
-        v-if="variant"
+        v-if="existingFor.length"
         class="form-check d-flex align-items-center gap-2 mt-2"
       >
-        <input v-model="use" type="checkbox" class="form-check-input m-0" />
+        <input v-model="replace" type="checkbox" class="form-check-input m-0" />
         <span class="small">
-          Print these instead of the full bullets on {{ variant.name }}
+          Replace the {{ existingFor.length }} existing for {{ forName }}
         </span>
       </label>
     </div>
@@ -355,17 +387,12 @@ onMounted(load);
       <button
         type="button"
         class="a-btn a-btn--primary"
-        :disabled="!accepted.length || busy || loading"
+        :disabled="!accepted.length || loading"
         @click="accept"
       >
-        Add {{ accepted.length || "" }} to the library
+        Add {{ accepted.length || "" }} for {{ forName }}
       </button>
-      <button
-        type="button"
-        class="a-btn"
-        :disabled="busy"
-        @click="emit('cancel')"
-      >
+      <button type="button" class="a-btn" @click="emit('cancel')">
         Cancel
       </button>
     </div>

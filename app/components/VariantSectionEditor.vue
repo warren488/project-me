@@ -27,6 +27,8 @@ defineProps<{
   engagementsOf: (jobId: string) => LibraryEntry[];
   expanded: Set<string>;
   sheetOf?: (index: number) => number | undefined;
+  variantId: string; // the CV being edited, for its condensed highlights
+  variantNames: Map<string, string>; // variant id -> name, for row labels
 }>();
 
 const emit = defineEmits<{
@@ -41,7 +43,6 @@ const emit = defineEmits<{
   (e: "remove", id: string): void;
   (e: "update-ref", index: number, ref: VariantRef): void;
   (e: "expand", id: string): void;
-  (e: "condense", entry: LibraryEntry): void;
 }>();
 
 const orderValue = (event: Event) =>
@@ -133,12 +134,13 @@ const toggleEntry = (id: string, on: boolean) =>
           :can-up="r > 0"
           :can-down="r < item.refs.length - 1"
           :sheet="sheetOf?.(r)"
+          :variant-id="variantId"
+          :variant-names="variantNames"
           @toggle="toggleEntry(refId(ref), $event)"
           @update="emit('update-ref', r, $event)"
           @move="emit('move-ref', r, $event)"
           @break-after="emit('break-after-ref', r)"
           @expand="emit('expand', $event)"
-          @condense="emit('condense', $event)"
         />
         <div v-else class="vse__missing">
           <span class="flex-grow-1">Missing entry: {{ refId(ref) }}</span>
@@ -162,6 +164,8 @@ const toggleEntry = (id: string, on: boolean) =>
         :can-up="false"
         :can-down="false"
         :absent="absent"
+        :variant-id="variantId"
+        :variant-names="variantNames"
         @toggle="toggleEntry(entry.id, $event)"
       />
     </template>

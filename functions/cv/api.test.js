@@ -66,19 +66,37 @@ async function call(handler, method, path, body) {
   return { status: res.statusCode, body: JSON.parse(chunks.join("")) };
 }
 
+const fullVariant = {
+  id: "full",
+  name: "Full CV",
+  title: "Frontend lead",
+  summary: "<b>Hands on</b>",
+  sections: [{ section: "experience", refs: ["job-rad"] }],
+};
+
 test("POST condense/:id returns the prompt without a provider, and 501 when asked to run", async () => {
-  const handler = createHandler({ store: memoryStore(library), prefix: "/api/cv" });
+  const handler = createHandler({
+    store: memoryStore(library, [fullVariant]),
+    prefix: "/api/cv",
+  });
   const r = await call(handler, "POST", "/api/cv/condense/eng-ovo", {
-    audience: { title: "Frontend lead", summary: "<b>Hands on</b>" },
+    for: "full",
     count: 3,
   });
   assert.equal(r.status, 200);
   assert.deepEqual(r.body.ids, ["ovo-a", "ovo-b"]);
   assert.equal(r.body.count, 3);
+  assert.equal(r.body.for, "full");
   assert.match(r.body.prompt.user, /Job: Engineer at RAD \(Oct 2022 – Present\)/);
   assert.match(r.body.prompt.user, /Client engagement: OVO \(Jan 2023 – Jun 2024\)/);
   assert.match(r.body.prompt.user, /Frontend lead\. Its summary reads: Hands on/);
   assert.equal(r.body.proposals, undefined);
+
+  const general = await call(handler, "POST", "/api/cv/condense/eng-ovo", {});
+  assert.match(general.body.prompt.user, /general software engineering audience/);
+  assert.equal(general.body.for, "");
+  const missing = await call(handler, "POST", "/api/cv/condense/eng-ovo", { for: "nope" });
+  assert.equal(missing.status, 400);
 
   const run = await call(handler, "POST", "/api/cv/condense/eng-ovo", { run: true });
   assert.equal(run.status, 501);
@@ -126,14 +144,24 @@ test("cleanEntry keeps highlights, filters `from`, and refuses id clashes", () =
     title: "OVO",
     bullets: [{ id: "ovo-a", text: "A" }],
     highlights: [
-      { id: "ovo-hl-one", text: " One ", from: ["ovo-a", "other"] },
-      { id: "ovo-hl-two", text: "Two" },
+      { id: "ovo-hl-one", text: " One ", from: ["ovo-a", "other"], for: "full" },
+      { id: "ovo-hl-two", text: "Two", for: "" },
     ],
   });
   assert.deepEqual(entry.highlights, [
-    { id: "ovo-hl-one", text: "One", from: ["ovo-a"] },
+    { id: "ovo-hl-one", text: "One", for: "full", from: ["ovo-a"] },
     { id: "ovo-hl-two", text: "Two" },
   ]);
+  assert.throws(
+    () =>
+      cleanEntry({
+        id: "job-x",
+        kind: "job",
+        title: "X",
+        highlights: [{ id: "x-hl", text: "B", for: "Not An Id" }],
+      }),
+    /Invalid highlight "x-hl" for/
+  );
   assert.throws(
     () =>
       cleanEntry({
@@ -208,4 +236,55 @@ test("a variant may pick highlights by id; saving the entry keeps them; removing
   assert.ok(exported.body.library.entries[1].highlights);
   const imported = await call(handler, "POST", "/api/cv/import", exported.body);
   assert.equal(imported.status, 200, JSON.stringify(imported.body));
+});
+
+test("a condensed pick resolves to the CV's own set, else general, else the full bullets", async () => {
+  const ovo = {
+    ...library.entries[1],
+    highlights: [
+      { id: "ovo-hl-full", text: "For the full CV", for: "full" },
+      { id: "ovo-hl-gen", text: "General one" },
+    ],
+  };
+  const rad = {
+    ...library.entries[0],
+    highlights: [{ id: "rad-hl-full", text: "RAD for full", for: "full" }],
+  };
+  const lib = { ...library, entries: [rad, ovo, library.entries[2]] };
+  const condensedRef = { id: "job-rad", condensed: true, engagements: { "eng-ovo": { condensed: true } } };
+  const full = { ...fullVariant, sections: [{ section: "experience", refs: [condensedRef] }] };
+  const ats = { id: "ats", name: "ATS", title: "Any", sections: [{ section: "experience", refs: [condensedRef] }] };
+  const store = memoryStore(lib, [full, ats]);
+  const handler = createHandler({ store, prefix: "/api/cv" });
+
+  const onFull = await call(handler, "POST", "/api/cv/preview", full);
+  assert.equal(onFull.status, 200, JSON.stringify(onFull.body));
+  assert.deepEqual(onFull.body.pages[0].experience[0].details, ["RAD for full"]);
+  assert.deepEqual(onFull.body.pages[0].experience[0].engagements[0].details, ["For the full CV"]);
+
+  const onAts = await call(handler, "POST", "/api/cv/preview", ats);
+  // RAD has no ATS set and no general one: the full bullets print.
+  assert.deepEqual(onAts.body.pages[0].experience[0].details, ["Job bullet"]);
+  // OVO falls back to its general highlight.
+  assert.deepEqual(onAts.body.pages[0].experience[0].engagements[0].details, ["General one"]);
+
+  // Usage names the resolved highlights, and a condensed pick pins no ids:
+  // the full-CV set can be dropped and the variant still validates.
+  const state = await call(handler, "GET", "/api/cv/state");
+  assert.deepEqual(state.body.usage["eng-ovo"].bullets, { "ovo-hl-full": ["full"], "ovo-hl-gen": ["ats"] });
+  const dropped = await call(handler, "PUT", "/api/cv/entries/eng-ovo", { ...ovo, highlights: [] });
+  assert.equal(dropped.status, 200, JSON.stringify(dropped.body));
+  const after = await call(handler, "POST", "/api/cv/preview", full);
+  assert.deepEqual(after.body.pages[0].experience[0].engagements[0].details, ["Did A", "Did B"]);
+
+  // A hidden, condensed engagement rolls its set up under the job.
+  const rolled = { ...full, sections: [{ section: "experience", refs: [{ id: "job-rad", engagements: { "eng-ovo": { show: false, condensed: true } } }] }] };
+  await call(handler, "PUT", "/api/cv/entries/eng-ovo", ovo);
+  const rolledUp = await call(handler, "POST", "/api/cv/preview", rolled);
+  assert.deepEqual(rolledUp.body.pages[0].experience[0].details, ["Job bullet", "For the full CV"]);
+  assert.equal(rolledUp.body.pages[0].experience[0].engagements, undefined);
+
+  const bad = await call(handler, "POST", "/api/cv/preview", { ...full, sections: [{ section: "experience", refs: [{ id: "job-rad", condensed: "yes" }] }] });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /"condensed" must be a boolean/);
 });

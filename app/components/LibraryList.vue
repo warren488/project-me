@@ -2,8 +2,8 @@
 import { computed, ref } from "vue";
 import type { EntryKind, LibraryEntry } from "@/cv/types";
 
-// The Library tab: every entry, grouped and searchable. Clicking a row opens
-// it for editing; what goes on a CV is decided in the Layout tab instead.
+// The Library workspace: every entry, grouped and searchable. Clicking a row
+// opens it for editing; what goes on a CV is decided under CVs instead.
 const props = defineProps<{
   entries: LibraryEntry[];
   timelineKinds: string[]; // kinds on the timeline by default
@@ -164,6 +164,9 @@ function surfaceChips(e: LibraryEntry) {
       </button>
     </div>
 
+    <p v-if="!entries.length" class="small text-muted">
+      No entries yet. Add one, or Import a bundle.
+    </p>
     <div v-for="group in groups" :key="group.label" class="mb-3">
       <h6 class="lib__group">
         {{ group.label }}

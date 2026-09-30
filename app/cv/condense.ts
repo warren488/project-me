@@ -189,16 +189,27 @@ export function highlightIds(entry: LibraryEntry, texts: string[]): string[] {
   });
 }
 
+// `taken` holds ids already in use on the entry (the editor's unsaved form
+// may hold more than the saved entry does).
 export const toHighlights = (
   entry: LibraryEntry,
-  proposals: Proposal[]
+  proposals: Proposal[],
+  forId: string,
+  taken: string[] = []
 ): Highlight[] => {
   const ids = highlightIds(
-    entry,
+    {
+      ...entry,
+      highlights: [
+        ...(entry.highlights ?? []),
+        ...taken.map((id) => ({ id, text: "" })),
+      ],
+    },
     proposals.map((p) => p.text)
   );
   return proposals.map((p, i) => {
     const highlight: Highlight = { id: ids[i], text: p.text };
+    if (forId) highlight.for = forId;
     if (p.from.length) highlight.from = p.from;
     return highlight;
   });

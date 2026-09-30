@@ -165,6 +165,7 @@ export interface Bullet {
 export interface Highlight {
   id: string;
   text: string;
+  for?: string; // the variant it was written for; absent = general
   from?: string[];
 }
 
@@ -219,18 +220,26 @@ export const SIDEBAR_SECTIONS: SectionName[] = [
 export interface EngagementPick {
   show?: boolean;
   bullets?: string[];
+  condensed?: boolean; // print the engagement's highlights for this CV
 }
 
 // "entry-id" = every bullet and every engagement. The object form picks the
-// job's own bullets (in print order) and, for engagements, either all
-// (true / absent), none (false) or a map of deviations by engagement id.
+// job's own bullets (in print order) or its condensed highlights, and, for
+// engagements, either all (true / absent), none (false) or a map of
+// deviations by engagement id.
 export type VariantRef =
   | string
   | {
       id: string;
       bullets?: string[];
+      condensed?: boolean;
       engagements?: boolean | Record<string, EngagementPick>;
     };
+
+// How an entry's bullets are picked on a CV. Derived from the ref, never
+// stored: "full" = the default, "condensed" = its highlights for this CV,
+// "custom" = an explicit list.
+export type PickMode = "full" | "condensed" | "custom";
 
 // A page break: between sections, or between refs of a main-column section.
 export interface PageBreak {
