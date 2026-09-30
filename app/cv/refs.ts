@@ -10,8 +10,15 @@ export const refId = (ref: VariantRef) =>
 // One-line label text for HTML bullet text.
 export const plain = (html: string) => html.replace(/<[^>]+>/g, "");
 
+// The default selection: the full bullets, never the condensed highlights.
 const bulletIds = (entry: LibraryEntry) =>
   (entry.bullets ?? []).map((b) => b.id);
+
+// Every id a ref may list: bullets and highlights.
+export const allBulletIds = (entry: LibraryEntry) => [
+  ...bulletIds(entry),
+  ...(entry.highlights ?? []).map((h) => h.id),
+];
 
 // The entry's own selected bullet ids, in print order.
 export function ownBullets(entry: LibraryEntry, ref: VariantRef): string[] {
@@ -111,14 +118,14 @@ export function normalizeRef(
 ): VariantRef {
   if (typeof ref === "string") return ref;
   const next = expand(ref);
-  const have = new Set(bulletIds(entry));
+  const have = new Set(allBulletIds(entry));
   if (next.bullets) next.bullets = next.bullets.filter((b) => have.has(b));
   if (next.engagements && typeof next.engagements === "object") {
     const map: Record<string, EngagementPick> = {};
     for (const eng of engagements) {
       const pick = next.engagements[eng.id];
       if (!pick) continue;
-      const ids = new Set(bulletIds(eng));
+      const ids = new Set(allBulletIds(eng));
       const clean: EngagementPick = { ...pick };
       if (clean.bullets)
         clean.bullets = clean.bullets.filter((b) => ids.has(b));

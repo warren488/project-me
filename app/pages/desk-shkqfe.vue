@@ -11,7 +11,14 @@ import { onBeforeRouteLeave } from "vue-router";
 import { api, ApiError } from "@/cv/api";
 import { useAuth } from "@/composables/useAuth";
 import { sortRefsByDate } from "@/cv/order";
-import { normalizeRef, refId } from "@/cv/refs";
+import {
+  engagementPick,
+  normalizeRef,
+  refId,
+  withBullets,
+  withEngagement,
+} from "@/cv/refs";
+import CondenseDialog from "@/components/CondenseDialog.vue";
 import CvAtsDocument from "@/components/CvAtsDocument.vue";
 import CvDocument from "@/components/CvDocument.vue";
 import EntryEditor from "@/components/EntryEditor.vue";
@@ -21,6 +28,7 @@ import type {
   CVPage,
   EntryKind,
   EntryUsage,
+  Highlight,
   LibraryEntry,
   PageBreak,
   Profile,
@@ -367,8 +375,60 @@ function sectionOn(i: number, absent?: SectionName) {
     remove: (id: string) => removeRef(id),
     updateRef: (index: number, ref: VariantRef) => setRef(i, index, ref),
     expand: toggleNode,
+    condense: startCondense,
   };
 }
+
+// --- Condense: a few AI-written highlights standing in for the bullets ---
+const condensing = ref<{ entry: LibraryEntry; job?: LibraryEntry } | null>(
+  null
+);
+
+function startCondense(entry: LibraryEntry) {
+  const job =
+    entry.kind === "engagement" && entry.parent
+      ? byId.value.get(entry.parent)
+      : undefined;
+  condensing.value = { entry, job };
+}
+
+// Saves the accepted highlights on the entry, then (if asked) makes them the
+// pick for that entry on the current variant in place of the full bullets.
+const acceptHighlights = (highlights: Highlight[], use: boolean) =>
+  run(async () => {
+    const target = condensing.value;
+    if (!target) return;
+    const { displayDates: _dates, ...stored } = target.entry;
+    const entry: LibraryEntry = {
+      ...stored,
+      highlights: [...(stored.highlights ?? []), ...highlights],
+    };
+    await api(`entries/${entry.id}`, "PUT", entry);
+    await loadState();
+    reconcileVariant();
+    const ids = highlights.map((h) => h.id);
+    const fresh = byId.value.get(entry.id);
+    const job = target.job ? byId.value.get(target.job.id) : fresh;
+    const at = job && placement.value.get(job.id);
+    if (use && fresh && job && at) {
+      const next = target.job
+        ? withEngagement(job, at.ref, engagementsOf(job.id), fresh, {
+            show: engagementPick(at.ref, fresh.id).show,
+            bullets: ids,
+          })
+        : withBullets(job, at.ref, ids);
+      setRef(at.item, at.index, next);
+      const open = new Set(expandedNodes.value);
+      open.add(job.id);
+      open.add(fresh.id);
+      expandedNodes.value = open;
+    }
+    schedulePreview();
+    condensing.value = null;
+    flash(
+      `Added ${ids.length} highlight${ids.length === 1 ? "" : "s"} to "${entry.title}"`
+    );
+  });
 
 // --- Profile (name and contact details, shared by every variant) ---
 const profileForm = ref<Profile | null>(null);
@@ -1217,6 +1277,25 @@ onBeforeRouteLeave(
           @save="saveEntry"
           @delete="deleteEntry"
           @cancel="editor = null"
+        />
+      </div>
+    </div>
+
+    <!-- Condense -->
+    <div
+      v-if="condensing"
+      class="cv-admin__modal no-print"
+      @click.self="condensing = null"
+    >
+      <div class="cv-admin__dialog">
+        <CondenseDialog
+          :key="condensing.entry.id"
+          :entry="condensing.entry"
+          :job="condensing.job"
+          :variant="variant"
+          :busy="busy"
+          @accept="acceptHighlights"
+          @cancel="condensing = null"
         />
       </div>
     </div>

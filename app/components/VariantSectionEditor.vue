@@ -41,6 +41,7 @@ const emit = defineEmits<{
   (e: "remove", id: string): void;
   (e: "update-ref", index: number, ref: VariantRef): void;
   (e: "expand", id: string): void;
+  (e: "condense", entry: LibraryEntry): void;
 }>();
 
 const orderValue = (event: Event) =>
@@ -137,6 +138,7 @@ const toggleEntry = (id: string, on: boolean) =>
           @move="emit('move-ref', r, $event)"
           @break-after="emit('break-after-ref', r)"
           @expand="emit('expand', $event)"
+          @condense="emit('condense', $event)"
         />
         <div v-else class="vse__missing">
           <span class="flex-grow-1">Missing entry: {{ refId(ref) }}</span>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Bullet, LibraryEntry, VariantRef } from "@/cv/types";
+import type { LibraryEntry, VariantRef } from "@/cv/types";
 import {
   engagementBullets,
   engagementPick,
@@ -33,12 +33,22 @@ const emit = defineEmits<{
   (e: "move", by: number): void;
   (e: "break-after"): void;
   (e: "expand", id: string): void;
+  (e: "condense", entry: LibraryEntry): void;
 }>();
+
+// A tickable line: a full bullet, or a condensed highlight (marked so).
+type Row = { id: string; text: string; condensed: boolean };
+const rowsOf = (entry: LibraryEntry): Row[] => [
+  ...(entry.bullets ?? []).map((b) => ({ ...b, condensed: false })),
+  ...(entry.highlights ?? []).map((h) => ({ ...h, condensed: true })),
+];
+const hasRows = (entry: LibraryEntry) =>
+  !!(entry.bullets?.length || entry.highlights?.length);
 
 const selected = computed(() => props.value !== null);
 const bullets = computed(() => props.entry.bullets ?? []);
 const hasChildren = computed(
-  () => bullets.value.length > 0 || props.engagements.length > 0
+  () => hasRows(props.entry) || props.engagements.length > 0
 );
 const open = computed(
   () => selected.value && props.expanded.has(props.entry.id)
@@ -52,13 +62,14 @@ const ownIds = computed(() =>
   selected.value ? ownBullets(props.entry, ref()) : []
 );
 // Selected ones in print order, then the rest in library order.
-const ownRows = computed(() => {
+const ownRows = computed((): Row[] => {
+  const all = rowsOf(props.entry);
   const chosen = new Set(ownIds.value);
-  const byId = new Map(bullets.value.map((b) => [b.id, b]));
+  const byId = new Map(all.map((r) => [r.id, r]));
   return [
-    ...ownIds.value.map((id) => byId.get(id)).filter(Boolean),
-    ...bullets.value.filter((b) => !chosen.has(b.id)),
-  ] as Bullet[];
+    ...ownIds.value.map((id) => byId.get(id)).filter((r): r is Row => !!r),
+    ...all.filter((r) => !chosen.has(r.id)),
+  ];
 });
 function setOwn(ids: string[]) {
   emit("update", withBullets(props.entry, ref(), ids));
@@ -71,15 +82,15 @@ function toggleOwn(id: string, on: boolean) {
 // --- Engagements ---
 const pickOf = (eng: LibraryEntry) => engagementPick(ref(), eng.id);
 const engIds = (eng: LibraryEntry) => engagementBullets(eng, ref());
-const engRows = (eng: LibraryEntry) => {
+const engRows = (eng: LibraryEntry): Row[] => {
   const ids = engIds(eng);
   const chosen = new Set(ids);
-  const all = eng.bullets ?? [];
-  const byId = new Map(all.map((b) => [b.id, b]));
+  const all = rowsOf(eng);
+  const byId = new Map(all.map((r) => [r.id, r]));
   return [
-    ...ids.map((id) => byId.get(id)).filter(Boolean),
-    ...all.filter((b) => !chosen.has(b.id)),
-  ] as typeof all;
+    ...ids.map((id) => byId.get(id)).filter((r): r is Row => !!r),
+    ...all.filter((r) => !chosen.has(r.id)),
+  ];
 };
 function setEngagement(eng: LibraryEntry, show: boolean, ids?: string[]) {
   emit(
@@ -108,12 +119,21 @@ const title = computed(() =>
     ? `${props.entry.title} · ${props.entry.org}`
     : props.entry.title
 );
+// "2/5 bullets", "3 condensed", or "3 condensed + 1/5 bullets".
+const pickLabel = (entry: LibraryEntry, ids: string[]) => {
+  const highlights = new Set((entry.highlights ?? []).map((h) => h.id));
+  const condensed = ids.filter((id) => highlights.has(id)).length;
+  const full = ids.length - condensed;
+  const total = (entry.bullets ?? []).length;
+  if (!condensed)
+    return total && full !== total ? `${full}/${total} bullets` : "";
+  return `${condensed} condensed${full ? ` + ${full}/${total} bullets` : ""}`;
+};
 const meta = computed(() => {
   if (!selected.value) return [];
   const out: string[] = [];
-  if (bullets.value.length && ownIds.value.length !== bullets.value.length) {
-    out.push(`${ownIds.value.length}/${bullets.value.length} bullets`);
-  }
+  const own = pickLabel(props.entry, ownIds.value);
+  if (own) out.push(own);
   if (props.engagements.length) {
     const shown = props.engagements.filter((e) => pickOf(e).show).length;
     const rolled = props.engagements
@@ -127,9 +147,8 @@ const meta = computed(() => {
 const engMeta = (eng: LibraryEntry) => {
   const pick = pickOf(eng);
   const n = engIds(eng).length;
-  const total = (eng.bullets ?? []).length;
   if (!pick.show) return n ? `${n} rolled up` : "hidden";
-  return total && n !== total ? `${n}/${total} bullets` : "";
+  return pickLabel(eng, engIds(eng));
 };
 </script>
 
@@ -191,6 +210,15 @@ const engMeta = (eng: LibraryEntry) => {
       >
         ⤓
       </button>
+      <button
+        v-if="selected && !absent && bullets.length"
+        type="button"
+        class="a-btn a-btn--icon"
+        title="Condense these bullets into a few highlights"
+        @click="emit('condense', entry)"
+      >
+        ✦
+      </button>
     </div>
 
     <template v-if="open">
@@ -210,6 +238,13 @@ const engMeta = (eng: LibraryEntry) => {
         <span class="ler__label" :title="plain(b.text)">{{
           plain(b.text)
         }}</span>
+        <span
+          v-if="b.condensed"
+          class="ler__tag is-condensed"
+          title="A condensed highlight: prints only when ticked"
+        >
+          condensed
+        </span>
         <template v-if="ownIds.includes(b.id)">
           <button
             type="button"
@@ -239,7 +274,7 @@ const engMeta = (eng: LibraryEntry) => {
           :class="{ 'is-off': !pickOf(eng).show }"
         >
           <button
-            v-if="eng.bullets?.length"
+            v-if="hasRows(eng)"
             type="button"
             class="ler__toggle"
             :title="expanded.has(eng.id) ? 'Collapse' : 'Expand'"
@@ -267,6 +302,15 @@ const engMeta = (eng: LibraryEntry) => {
             >
           </span>
           <span v-if="engMeta(eng)" class="ler__tag">{{ engMeta(eng) }}</span>
+          <button
+            v-if="!absent && eng.bullets?.length"
+            type="button"
+            class="a-btn a-btn--icon"
+            title="Condense this client's bullets into a few highlights"
+            @click="emit('condense', eng)"
+          >
+            ✦
+          </button>
         </div>
         <template v-if="expanded.has(eng.id)">
           <div
@@ -289,6 +333,13 @@ const engMeta = (eng: LibraryEntry) => {
             <span class="ler__label" :title="plain(b.text)">{{
               plain(b.text)
             }}</span>
+            <span
+              v-if="b.condensed"
+              class="ler__tag is-condensed"
+              title="A condensed highlight: prints only when ticked"
+            >
+              condensed
+            </span>
             <span
               v-if="!pickOf(eng).show && engIds(eng).includes(b.id)"
               class="ler__tag is-rollup"
@@ -399,6 +450,10 @@ const engMeta = (eng: LibraryEntry) => {
   &.is-rollup {
     background: var(--ad-rollup-bg);
     color: var(--ad-rollup-text);
+  }
+  &.is-condensed {
+    background: var(--ad-on-bg);
+    color: var(--ad-on-text);
   }
 }
 

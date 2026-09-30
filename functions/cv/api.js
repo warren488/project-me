@@ -22,6 +22,7 @@ const {
   PROJECT_STATUSES,
   PROJECT_HOMES,
 } = require("./publish");
+const { buildPrompt, parseProposals } = require("./condense");
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
@@ -184,8 +185,39 @@ function cleanEntry(input) {
     });
     if (!entry.bullets.length) delete entry.bullets;
   }
+  // Condensed highlights share the id space with the bullets; `from` may
+  // only name this entry's own bullets.
+  if (input.highlights !== undefined && input.highlights !== null) {
+    if (!Array.isArray(input.highlights))
+      throw new Error("Highlights must be a list");
+    const seen = new Set((entry.bullets || []).map((b) => b.id));
+    entry.highlights = input.highlights.map((h) => {
+      const highlightId = checkId(h && h.id, "highlight id");
+      if (seen.has(highlightId))
+        throw new Error(`Duplicate bullet id "${highlightId}"`);
+      seen.add(highlightId);
+      const text = optionalString(h, "text");
+      if (!text) throw new Error(`Highlight "${highlightId}" has no text`);
+      const highlight = { id: highlightId, text };
+      if (h.from !== undefined && h.from !== null) {
+        if (!Array.isArray(h.from) || h.from.some((f) => typeof f !== "string"))
+          throw new Error(`Highlight "${highlightId}": "from" must be a list`);
+        const own = new Set((entry.bullets || []).map((b) => b.id));
+        const from = [...new Set(h.from.filter((f) => own.has(f)))];
+        if (from.length) highlight.from = from;
+      }
+      return highlight;
+    });
+    if (!entry.highlights.length) delete entry.highlights;
+  }
   return entry;
 }
+
+// Every id a variant may list for an entry: its bullets and highlights.
+const bulletIdsOf = (entry) => [
+  ...(entry.bullets || []).map((b) => b.id),
+  ...(entry.highlights || []).map((h) => h.id),
+];
 
 // The site's project card fields. `tech` is a list (a legacy string is split
 // on bullets or commas). Anything shown on the home page needs the full card.
@@ -241,7 +273,7 @@ function cleanProject(input, entry) {
 // Refuse changes that would break a saved variant, naming the variant so the
 // user can fix it there first.
 function checkEntryStillFits(entry, variants) {
-  const have = new Set((entry.bullets || []).map((b) => b.id));
+  const have = new Set(bulletIdsOf(entry));
   const checkBullets = (variant, ids) => {
     const missing = (ids || []).filter((b) => !have.has(b));
     if (missing.length) {
@@ -293,7 +325,9 @@ function cleanProfile(input) {
 }
 
 // --- Everything that touches a store ---
-function createHandler({ store, authorize, prefix = "" }) {
+// `provider` is an optional factory returning an AI provider (see ai.js) or
+// null; it is called per request so secrets resolve at runtime.
+function createHandler({ store, authorize, prefix = "", provider }) {
   // An empty store (nothing imported yet) is an empty library, not an error,
   // so the dashboard can offer Import.
   const readLibraryOrEmpty = () =>
@@ -397,6 +431,61 @@ function createHandler({ store, authorize, prefix = "" }) {
     await publishSiteData(store);
   }
 
+  // "Condense": the prompt that turns an entry's bullets into a few
+  // highlights, and (when asked and a provider is configured) the model's
+  // proposals. The prompt is always returned so the dashboard can run it
+  // elsewhere: a local model, or a chat tool by hand.
+  async function condense(id, input) {
+    checkId(id, "entry id");
+    const library = await store.readLibrary();
+    const entry = library.entries.find((e) => e.id === id);
+    if (!entry) throw new Error(`No entry "${id}"`);
+    if (entry.kind !== "job" && entry.kind !== ENGAGEMENT_KIND)
+      throw new Error("Only jobs and client engagements can be condensed");
+    const job =
+      entry.kind === ENGAGEMENT_KIND
+        ? library.entries.find((e) => e.id === entry.parent)
+        : undefined;
+    for (const e of [entry, job]) if (e) e.displayDates = formatRange(e);
+    const audience =
+      input.audience && typeof input.audience === "object"
+        ? {
+            title: String(input.audience.title || ""),
+            summary: String(input.audience.summary || ""),
+          }
+        : undefined;
+    const prompt = buildPrompt({ entry, job, audience, count: input.count });
+    const out = {
+      prompt: { system: prompt.system, user: prompt.user },
+      ids: prompt.ids,
+      count: prompt.count,
+    };
+    if (!input.run) return { status: 200, body: out };
+    const ai = provider ? provider() : null;
+    if (!ai) {
+      return {
+        status: 501,
+        body: {
+          ...out,
+          error:
+            "No AI provider is configured on the server. Use a local model or copy the prompt instead.",
+        },
+      };
+    }
+    try {
+      const text = await ai.complete(prompt);
+      const proposals = parseProposals(text, prompt.ids);
+      if (!proposals.length)
+        throw new Error(`The model's reply had no bullets in it: ${text.slice(0, 200)}`);
+      return {
+        status: 200,
+        body: { ...out, proposals, provider: { name: ai.name, model: ai.model } },
+      };
+    } catch (err) {
+      return { status: 502, body: { ...out, error: err.message } };
+    }
+  }
+
   // A bundle is a backup of everything editable: the library, the variants,
   // and (informationally) the site output. Import replaces the lot, then
   // regenerates the site output from the imported data.
@@ -498,6 +587,10 @@ function createHandler({ store, authorize, prefix = "" }) {
         case "DELETE entries/:id":
           await deleteEntry(id);
           return send(200, { ok: true });
+        case "POST condense/:id": {
+          const result = await condense(id, await readBody(req));
+          return send(result.status, result.body);
+        }
         case "GET export":
           return send(200, await exportBundle());
         case "POST import":

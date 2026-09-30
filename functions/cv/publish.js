@@ -167,13 +167,15 @@ function resolveVariant(library, variant) {
     return { entry, ref };
   };
 
-  // The texts of the listed bullet ids, in that order; all of them if none
-  // are listed.
+  // The texts of the listed ids, in that order; all the bullets if none are
+  // listed. Listed ids may name condensed highlights too, but those are never
+  // part of the default.
   const pickBullets = (entry, ids) => {
     const bullets = entry.bullets || [];
     if (!ids) return bullets.map((b) => b.text);
+    const known = [...bullets, ...(entry.highlights || [])];
     return ids.map((bulletId) => {
-      const bullet = bullets.find((b) => b.id === bulletId);
+      const bullet = known.find((b) => b.id === bulletId);
       if (!bullet)
         throw new Error(
           `${where}: unknown bullet "${bulletId}" on "${entry.id}"`

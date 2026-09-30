@@ -66,6 +66,7 @@ const visibleEntries = computed(() => {
       ...(e.tech ?? []),
       ...e.tags,
       ...(e.bullets ?? []).map((b) => b.text),
+      ...(e.highlights ?? []).map((h) => h.text),
     ];
     return haystack.some((text) => text?.toLowerCase().includes(q));
   });

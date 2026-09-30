@@ -4,6 +4,7 @@ import type {
   Bullet,
   EntryKind,
   EntryUsage,
+  Highlight,
   LibraryEntry,
   ProjectHome,
   ProjectStatus,
@@ -94,6 +95,15 @@ interface BulletForm {
   customId: boolean;
 }
 
+// A condensed highlight: no tags or timeline flag, but the bullets it came
+// from (kept as it was, only the text is edited here).
+interface HighlightForm {
+  id: string;
+  text: string;
+  from: string[];
+  customId: boolean;
+}
+
 const HOME_LABELS: Record<ProjectHome, string> = {
   featured: "Featured",
   more: "More projects",
@@ -125,6 +135,7 @@ const form = reactive({
   tags: "",
   notes: "",
   bullets: [] as BulletForm[],
+  highlights: [] as HighlightForm[],
 });
 const customId = ref(false); // user typed their own id, stop auto-generating
 const message = ref("");
@@ -164,6 +175,12 @@ watch(
         timeline: b.timeline !== false,
         customId: true,
       })),
+      highlights: (entry?.highlights ?? []).map((h) => ({
+        id: h.id,
+        text: h.text,
+        from: [...(h.from ?? [])],
+        customId: true,
+      })),
     });
     customId.value = !!entry;
     message.value = "";
@@ -191,20 +208,22 @@ watch(
   }
 );
 
-const bulletAutoId = (bullet: BulletForm) => {
-  const base = `${form.id.replace(/^[a-z]+-/, "")}-${slug(
-    bullet.text.split(/\s+/).slice(0, 3).join(" ")
+// Bullets and highlights share one id space on the entry.
+const idTaken = (id: string, except: BulletForm | HighlightForm) =>
+  form.bullets.some((b) => b !== except && b.id === id) ||
+  form.highlights.some((h) => h !== except && h.id === id);
+
+const autoRowId = (row: BulletForm | HighlightForm, mark: string) => {
+  const base = `${form.id.replace(/^[a-z]+-/, "")}${mark}-${slug(
+    row.text.split(/\s+/).slice(0, 3).join(" ")
   )}`.replace(/-+$/, "");
   let candidate = base || "bullet";
-  for (
-    let n = 2;
-    form.bullets.some((b) => b !== bullet && b.id === candidate);
-    n++
-  ) {
-    candidate = `${base}-${n}`;
-  }
+  for (let n = 2; idTaken(candidate, row); n++) candidate = `${base}-${n}`;
   return candidate;
 };
+const bulletAutoId = (bullet: BulletForm) => autoRowId(bullet, "");
+const highlightAutoId = (highlight: HighlightForm) =>
+  autoRowId(highlight, "-hl");
 
 watch(
   () => form.bullets.map((b) => b.text),
@@ -214,8 +233,50 @@ watch(
     }
   }
 );
+watch(
+  () => form.highlights.map((h) => h.text),
+  () => {
+    for (const highlight of form.highlights) {
+      if (!highlight.customId) highlight.id = highlightAutoId(highlight);
+    }
+  }
+);
 
 const bulletUsedIn = (id: string) => props.usage?.bullets[id] ?? [];
+
+// The source bullets a highlight was condensed from, for its tooltip.
+const sourceText = (from: string[]) =>
+  from
+    .map((id) => form.bullets.find((b) => b.id === id)?.text)
+    .filter((t): t is string => !!t)
+    .map((t) => t.replace(/<[^>]+>/g, ""))
+    .join("\n");
+
+function addHighlight() {
+  form.highlights.push({ id: "", text: "", from: [], customId: false });
+}
+
+function removeHighlight(index: number) {
+  const used = bulletUsedIn(form.highlights[index].id);
+  if (
+    used.length &&
+    !confirm(
+      `This highlight is used by ${used.join(
+        ", "
+      )}. Removing it here means it must be unticked there before this can be saved. Continue?`
+    )
+  ) {
+    return;
+  }
+  form.highlights.splice(index, 1);
+}
+
+function moveHighlight(index: number, by: number) {
+  const to = index + by;
+  if (to < 0 || to >= form.highlights.length) return;
+  const list = form.highlights;
+  [list[index], list[to]] = [list[to], list[index]];
+}
 
 function addBullet() {
   form.bullets.push({
@@ -307,6 +368,13 @@ function toEntry(): LibraryEntry {
       return bullet;
     });
   }
+  if (fields.value.bullets && form.highlights.length) {
+    entry.highlights = form.highlights.map((h): Highlight => {
+      const highlight: Highlight = { id: h.id.trim(), text: h.text.trim() };
+      if (h.from.length) highlight.from = [...h.from];
+      return highlight;
+    });
+  }
   return entry;
 }
 
@@ -320,6 +388,11 @@ function submit() {
     return (message.value = `An entry with id "${entry.id}" already exists`);
   if (entry.kind === "skill" && !entry.category)
     return (message.value = "Skills need a category");
+  const rowIds = [...(entry.bullets ?? []), ...(entry.highlights ?? [])].map(
+    (r) => r.id
+  );
+  const dup = rowIds.find((id, i) => rowIds.indexOf(id) !== i);
+  if (dup) return (message.value = `Two bullets share the id "${dup}"`);
   if (entry.kind === "engagement" && !entry.parent)
     return (message.value = "An engagement needs a job to sit under");
   if (entry.kind === "project" && entry.home !== "hidden") {
@@ -688,6 +761,83 @@ function remove() {
       </div>
       <p v-if="!form.bullets.length" class="small text-muted mb-0">
         No bullets yet.
+      </p>
+    </div>
+
+    <div v-if="fields.bullets" class="mt-3">
+      <div class="d-flex align-items-center mb-1">
+        <span class="entry-editor__label mb-0 flex-grow-1">
+          Condensed
+          <span class="text-muted fw-normal text-lowercase">
+            · highlights standing in for the bullets; print only when a CV picks
+            them
+          </span>
+        </span>
+        <button type="button" class="a-btn a-btn--icon" @click="addHighlight">
+          + Add
+        </button>
+      </div>
+      <div
+        v-for="(highlight, i) in form.highlights"
+        :key="i"
+        class="entry-editor__bullet"
+      >
+        <textarea
+          v-model="highlight.text"
+          rows="2"
+          class="form-control form-control-sm"
+          placeholder="One sentence that stands in for several bullets"
+          required
+        ></textarea>
+        <div class="d-flex gap-1 mt-1 align-items-center">
+          <input
+            v-model="highlight.id"
+            class="form-control form-control-sm font-monospace w-auto flex-grow-1"
+            title="Highlight id"
+            :readonly="bulletUsedIn(highlight.id).length > 0"
+            @input="highlight.customId = true"
+          />
+          <span
+            v-if="highlight.from.length"
+            class="chip chip--sm"
+            :title="sourceText(highlight.from)"
+          >
+            from {{ highlight.from.length }}
+          </span>
+          <button
+            type="button"
+            class="a-btn a-btn--icon"
+            title="Move up"
+            :disabled="i === 0"
+            @click="moveHighlight(i, -1)"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            class="a-btn a-btn--icon"
+            title="Move down"
+            :disabled="i === form.highlights.length - 1"
+            @click="moveHighlight(i, 1)"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            class="a-btn a-btn--icon"
+            title="Remove highlight"
+            @click="removeHighlight(i)"
+          >
+            ✕
+          </button>
+        </div>
+        <span v-if="bulletUsedIn(highlight.id).length" class="small text-muted">
+          Used in {{ bulletUsedIn(highlight.id).join(", ") }}
+        </span>
+      </div>
+      <p v-if="!form.highlights.length" class="small text-muted mb-0">
+        None yet. The ✦ button in the Layout tab writes them with a model's
+        help.
       </p>
     </div>
 

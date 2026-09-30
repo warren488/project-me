@@ -159,6 +159,15 @@ export interface Bullet {
   timeline?: boolean; // false = not shown on the public timeline (default true)
 }
 
+// A condensed bullet: a few of these stand in for an entry's full bullets on
+// a CV. Never printed unless a variant picks it by id, never on the timeline.
+// `from` records the source bullet ids it was distilled from.
+export interface Highlight {
+  id: string;
+  text: string;
+  from?: string[];
+}
+
 export interface LibraryEntry {
   id: string;
   kind: EntryKind;
@@ -174,6 +183,7 @@ export interface LibraryEntry {
   recent?: boolean; // false = keep out of the home page's "Recently" strip
   tags: string[];
   bullets?: Bullet[];
+  highlights?: Highlight[]; // jobs and engagements: condensed bullets
   notes?: string; // private scratch notes; never published anywhere
   // Projects on the site (see SiteProject).
   tagline?: string;
