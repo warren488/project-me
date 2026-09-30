@@ -1,9 +1,19 @@
 {
   "hosting": {
-    "public": "dist",
+    "public": ".output/public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
+    "trailingSlash": false,
     "headers": [
+      {
+        "source": "/desk-shkqfe",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex"
+          }
+        ]
+      },
       {
         "source": "**/*.@(js|css)",
         "headers": [
@@ -40,6 +50,18 @@
         ]
       }
     ],
+    "redirects": [
+      {
+        "source": "/my-experience",
+        "destination": "/cv",
+        "type": 301
+      },
+      {
+        "source": "/home",
+        "destination": "/",
+        "type": 301
+      }
+    ],
     "rewrites": [
       {
         "source": "/api/**",
@@ -47,10 +69,6 @@
           "functionId": "cvApi",
           "region": "europe-west2"
         }
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
       }
     ]
   },
@@ -77,6 +95,9 @@
     },
     "ui": {
       "enabled": false
+    },
+    "hosting": {
+      "port": 5000
     }
   }
 }

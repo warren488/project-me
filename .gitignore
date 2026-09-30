@@ -29,3 +29,9 @@ functions/.env.local
 .firebase/
 # Content backups exported from the admin
 cv-bundle*.json
+
+# Nuxt
+.nuxt
+.output
+.data
+.env
