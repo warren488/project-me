@@ -4,14 +4,37 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  provide,
   ref,
+  toRaw,
   watch,
 } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { api, ApiError } from "@/cv/api";
 import { useAuth } from "@/composables/useAuth";
+import {
+  addBullet,
+  addHighlight,
+  cleanHtml,
+  cleanText,
+  copyHighlight,
+  findLine,
+  forkGeneral,
+  insertAfter,
+  lineLists,
+  setField,
+  setLine,
+} from "@/cv/drafts";
+import { INLINE_EDIT } from "@/cv/inlineEdit";
+import type { TextSource } from "@/cv/inlineEdit";
 import { sortRefsByDate } from "@/cv/order";
-import { normalizeRef, refId } from "@/cv/refs";
+import {
+  engagementPick,
+  normalizeRef,
+  refId,
+  withBullets,
+  withEngagement,
+} from "@/cv/refs";
 import CvAtsDocument from "@/components/CvAtsDocument.vue";
 import CvDocument from "@/components/CvDocument.vue";
 import EntryEditor from "@/components/EntryEditor.vue";
@@ -22,6 +45,7 @@ import type {
   EntryKind,
   EntryUsage,
   LibraryEntry,
+  LineSource,
   PageBreak,
   Profile,
   SectionName,
@@ -90,7 +114,13 @@ function toggleTheme() {
 const zoom = ref(0.6);
 const paged = ref(true); // preview as A4 sheets so overflow is visible
 
-const entries = computed(() => state.value?.library.entries ?? []);
+// Entries whose text was edited in the preview and not saved yet, by id.
+// They stand in for the saved ones everywhere in the dashboard.
+const drafts = ref(new Map<string, LibraryEntry>());
+const savedEntries = computed(() => state.value?.library.entries ?? []);
+const entries = computed(() =>
+  savedEntries.value.map((e) => drafts.value.get(e.id) ?? e)
+);
 const byId = computed(() => new Map(entries.value.map((e) => [e.id, e])));
 const variantNames = computed(
   () => new Map((state.value?.variants ?? []).map((v) => [v.id, v.name]))
@@ -103,7 +133,11 @@ const sectionForKind = computed(() => {
   return map;
 });
 const dirty = computed(
-  () => !!variant.value && JSON.stringify(variant.value) !== savedSnapshot.value
+  () =>
+    !!variant.value &&
+    (JSON.stringify(variant.value) !== savedSnapshot.value ||
+      drafts.value.size > 0 ||
+      !!newLine.value)
 );
 
 // Where each selected entry currently sits in the variant.
@@ -471,6 +505,7 @@ const saveEntry = (entry: LibraryEntry) =>
     const isNew = !editor.value?.entry;
     await api(`entries/${entry.id}`, "PUT", entry);
     await loadState();
+    drafts.value.delete(entry.id);
     reconcileVariant();
     schedulePreview();
     editor.value = null;
@@ -483,6 +518,7 @@ const deleteEntry = () =>
     if (!entry) return;
     await api(`entries/${entry.id}`, "DELETE");
     await loadState();
+    drafts.value.delete(entry.id);
     reconcileVariant();
     schedulePreview();
     editor.value = null;
@@ -557,8 +593,11 @@ async function loadState() {
   state.value = await api<State>("state");
 }
 
+// Loading a variant starts clean: text edited in the preview and not saved
+// goes with the variant's own unsaved changes.
 async function loadVariant(id: string) {
   const loaded = await api<Variant>(`variants/${id}`);
+  discardDrafts();
   variant.value = loaded;
   savedSnapshot.value = JSON.stringify(loaded);
 }
@@ -572,12 +611,25 @@ function onSwitchVariant(event: Event) {
   run(() => loadVariant(select.value));
 }
 
+// One request saves the variant and the entries edited in its preview, so
+// neither is left behind if the other is refused.
 async function saveVariant() {
   if (!variant.value) return;
-  await api(`variants/${variant.value.id}`, "PUT", variant.value);
+  await api("save", "POST", {
+    variant: variant.value,
+    entries: [...drafts.value.values()],
+  });
   savedSnapshot.value = JSON.stringify(variant.value);
   await loadState();
+  drafts.value = new Map();
 }
+
+// Says so when Save will also write Library entries.
+const saveLabel = computed(() => {
+  const n = drafts.value.size;
+  if (!n) return "Save";
+  return `Save CV + ${n} ${n === 1 ? "entry" : "entries"}`;
+});
 
 const save = () =>
   run(async () => {
@@ -627,19 +679,22 @@ const previewError = ref("");
 let previewTimer: number | undefined;
 let previewSeq = 0;
 
+// Every change asks for a fresh preview and abandons the ones already on
+// their way, so an older answer never replaces newer text.
 function schedulePreview() {
-  const current = variant.value;
-  if (!current) return;
+  if (!variant.value) return;
+  const seq = ++previewSeq;
   window.clearTimeout(previewTimer);
   previewTimer = window.setTimeout(async () => {
-    const seq = ++previewSeq;
     try {
-      const { pages } = await api<{ pages: CVPage[] }>(
-        "preview",
-        "POST",
-        current
-      );
+      const { pages } = await api<{ pages: CVPage[] }>("preview", "POST", {
+        variant: variant.value,
+        entries: [...drafts.value.values()],
+      });
       if (seq !== previewSeq) return;
+      // These sources are fresh, so nothing needs redirecting any more.
+      copied.clear();
+      placeNewLine(pages);
       preview.value = pages;
       previewError.value = "";
     } catch (err) {
@@ -649,6 +704,293 @@ function schedulePreview() {
 }
 
 watch(variant, schedulePreview, { deep: true });
+watch(drafts, schedulePreview, { deep: true });
+
+// --- Editing the preview's text in place (see CvText) ---
+// Text that belongs to the CV (headline, summary) goes into the variant;
+// everything else goes into a draft of its library entry. Both wait for
+// Save. Condensed highlights are the exception to "library text is shared":
+// editing one on a CV always lands in that CV's own set, copying it first
+// when the CV was printing someone else's.
+const EDIT_KEY = "cv-admin-edit-text";
+const editText = ref(true);
+watch(editText, (on) => localStorage.setItem(EDIT_KEY, on ? "on" : "off"));
+const focusedText = ref<TextSource | null>(null);
+
+type LineText = Extract<TextSource, { kind: "line" }>;
+// A new line being typed in the preview: it sits under `after` and becomes
+// a bullet or highlight of that entry once it has text.
+const newLine = ref<{ after: LineSource; line: LineSource } | null>(null);
+// Highlights copied for this CV since the preview was last resolved, as
+// "entry/id" -> the copy's id. Until then the page still names the originals.
+const copied = new Map<string, string>();
+const currentId = (line: LineSource) =>
+  copied.get(`${line.entry}/${line.id}`) ?? line.id;
+
+function setDraft(entry: LibraryEntry) {
+  const saved = savedEntries.value.find((e) => e.id === entry.id);
+  if (JSON.stringify(entry) === JSON.stringify(saved))
+    drafts.value.delete(entry.id);
+  else drafts.value.set(entry.id, entry);
+}
+
+function discardDrafts() {
+  drafts.value = new Map();
+  copied.clear();
+  dropNewLine();
+}
+
+// Puts the line being typed back into freshly resolved pages.
+function placeNewLine(pages: CVPage[]) {
+  const pending = newLine.value;
+  if (!pending) return;
+  for (const list of lineLists(pages)) {
+    const at = list.lines.findIndex(
+      (l) =>
+        l.entry === pending.after.entry &&
+        (l.id === pending.after.id || l.id === currentId(pending.after))
+    );
+    if (at === -1) continue;
+    list.texts.splice(at + 1, 0, "");
+    list.lines.splice(at + 1, 0, toRaw(pending.line));
+    return;
+  }
+  newLine.value = null;
+}
+
+function dropNewLine() {
+  if (!newLine.value) return;
+  newLine.value = null;
+  for (const list of lineLists(preview.value)) {
+    const at = list.lines.findIndex((l) => !l.id);
+    if (at === -1) continue;
+    list.texts.splice(at, 1);
+    list.lines.splice(at, 1);
+  }
+  measureSoon();
+}
+
+function addLineAfter(src: TextSource) {
+  if (src.kind !== "line" || !src.line.id || !variant.value) return;
+  dropNewLine();
+  const { entry, id, highlight } = src.line;
+  const line: LineSource = { entry, id: "" };
+  if (highlight) Object.assign(line, { highlight, for: variant.value.id });
+  newLine.value = { after: { entry, id }, line };
+  placeNewLine(preview.value);
+  measureSoon();
+}
+
+// How the variant picks the lines of the entry a line belongs to: the job
+// itself, or one of its engagements (shown, or rolled up under the job).
+// `list` is the explicit list of ids when it has one (a custom pick).
+function linePick(src: LineText) {
+  const at = placement.value.get(src.job);
+  const entry = byId.value.get(src.line.entry);
+  if (!at || !entry) return null;
+  const own = entry.id === src.job;
+  const ref = at.ref;
+  const list = own
+    ? typeof ref === "string"
+      ? undefined
+      : ref.bullets
+    : engagementPick(ref, entry.id).bullets;
+  // Call after the entry's draft is stored: the ref is kept in its smallest
+  // form, which depends on the entry's current bullets.
+  const setList = (ids: string[]) => {
+    const job = byId.value.get(src.job);
+    const eng = byId.value.get(entry.id);
+    if (!job || !eng) return;
+    setRef(
+      at.item,
+      at.index,
+      own
+        ? withBullets(job, ref, ids)
+        : withEngagement(job, ref, engagementsOf(job.id), eng, {
+            show: engagementPick(ref, eng.id).show,
+            bullets: ids,
+          })
+    );
+  };
+  return { entry, list, setList };
+}
+
+// A highlight this CV prints but doesn't own, made its own: the one copy
+// when the pick lists ids, the whole general set when it is condensed.
+// Returns the entry with the copies and the id standing in for `id`.
+function ownHighlight(entry: LibraryEntry, id: string, custom: boolean) {
+  const forId = variant.value?.id ?? "";
+  if (custom) {
+    const copy = copyHighlight(entry, id, forId);
+    copied.set(`${entry.id}/${id}`, copy.id);
+    return copy;
+  }
+  const fork = forkGeneral(entry, forId);
+  for (const [from, to] of fork.ids) copied.set(`${entry.id}/${from}`, to);
+  return { entry: fork.entry, id: fork.ids.get(id) ?? id };
+}
+
+function commitLine(src: LineText, text: string): string {
+  const pick = linePick(src);
+  const forId = variant.value?.id;
+  if (!pick || !forId) return "";
+  const { list, setList } = pick;
+  const { line } = src;
+
+  // A new line: a bullet under a bullet, a highlight under a highlight.
+  if (!line.id) {
+    const pending = newLine.value;
+    if (!pending) return "";
+    if (!text) {
+      dropNewLine();
+      return "";
+    }
+    const afterId = currentId(pending.after);
+    const after = findLine(pick.entry, afterId);
+    let entry = pick.entry;
+    let anchor = afterId;
+    let id: string;
+    if (after?.highlight) {
+      if (!list && after.for !== forId)
+        ({ entry, id: anchor } = ownHighlight(entry, afterId, false));
+      ({ entry, id } = addHighlight(entry, anchor, text, forId));
+    } else {
+      ({ entry, id } = addBullet(entry, anchor, text));
+    }
+    setDraft(entry);
+    if (list) setList(insertAfter(list, id, (other) => other === afterId));
+    // The typed line stands in for the real one until the preview resolves.
+    for (const lines of lineLists(preview.value)) {
+      const at = lines.lines.findIndex((l) => !l.id);
+      if (at !== -1) lines.texts[at] = text;
+    }
+    pending.line.id = id;
+    newLine.value = null;
+    return text;
+  }
+
+  const id = currentId(line);
+  const found = findLine(pick.entry, id);
+  if (!found) return "";
+  if (!text || text === found.text) return found.text;
+  let entry = pick.entry;
+  let target = id;
+  if (found.highlight && found.for !== forId) {
+    ({ entry, id: target } = ownHighlight(entry, id, !!list));
+    Object.assign(line, { id: target, for: forId });
+  }
+  setDraft(setLine(entry, target, text));
+  if (list && target !== id)
+    setList(list.map((other) => (other === id ? target : other)));
+  return text;
+}
+
+function commitText(src: TextSource, raw: string, exact = false): string {
+  if (src.kind === "variant") {
+    const current = variant.value;
+    if (!current) return "";
+    const text = exact
+      ? raw
+      : src.field === "summary"
+        ? cleanHtml(raw)
+        : cleanText(raw);
+    if (text) current[src.field] = text;
+    return current[src.field] ?? "";
+  }
+  if (src.kind === "entry") {
+    const entry = byId.value.get(src.entry);
+    if (!entry) return "";
+    const text = exact ? raw : cleanText(raw);
+    const stored = entry[src.field] ?? "";
+    if (!text || text === stored) return stored;
+    setDraft(setField(entry, src.field, text));
+    return text;
+  }
+  if (src.kind === "line") return commitLine(src, exact ? raw : cleanHtml(raw));
+  return "";
+}
+
+provide(INLINE_EDIT, {
+  // Only the preview that is on screen: hidden, it is just for measuring.
+  enabled: computed(() => editText.value && showPreview.value),
+  focus: (src) => (focusedText.value = src),
+  typing: () => measureSoon(),
+  commit: commitText,
+  addAfter: addLineAfter,
+  open(src) {
+    if (src.kind === "profile") editProfile();
+    else if (src.kind === "open") {
+      const entry = byId.value.get(src.entry);
+      if (entry) openEditor(entry);
+    }
+  },
+});
+
+// What an edit to the focused text touches: this CV alone, or the library
+// and with it everything else that prints the same text.
+const others = (ids: string[] = []) =>
+  ids
+    .filter((id) => id !== variant.value?.id)
+    .map((id) => variantNames.value.get(id) ?? id);
+const onTimeline = (entry: LibraryEntry) =>
+  !!entry.start &&
+  (entry.timeline ?? state.value?.timelineKinds.includes(entry.kind) ?? false);
+const shared = (places: string[]) => ({
+  own: false,
+  text: places.length
+    ? `Library · also on ${places.join(", ")}`
+    : "Library · only this CV prints it",
+});
+const textScope = computed(() => {
+  const src = focusedText.value;
+  const current = variant.value;
+  if (!src || !current) return null;
+  if (src.kind === "variant") return { own: true, text: "This CV only" };
+  const use = (id: string) => state.value?.usage[id];
+  if (src.kind === "entry") {
+    const entry = byId.value.get(src.entry);
+    if (!entry) return null;
+    const places = others(use(entry.id)?.variants);
+    if (src.field !== "tagline" && onTimeline(entry))
+      places.push("the timeline");
+    if (entry.home && (src.field === "title" || src.field === "tagline"))
+      places.push("the home page");
+    return shared(places);
+  }
+  if (src.kind !== "line") return null;
+  const entry = byId.value.get(src.line.entry);
+  if (!entry) return null;
+  const line = src.line.id ? findLine(entry, currentId(src.line)) : src.line;
+  if (!line) return null;
+  if (line.highlight) {
+    if (line.for === current.id)
+      return {
+        own: true,
+        text: line.id
+          ? "Condensed for this CV · this CV only"
+          : "New condensed line · this CV only",
+      };
+    const owner = line.for
+      ? `Written for ${variantNames.value.get(line.for) ?? line.for}`
+      : "General condensed set";
+    return {
+      own: false,
+      text: `${owner} · editing makes a copy for this CV`,
+    };
+  }
+  if (!line.id)
+    return {
+      own: false,
+      text: `New Library bullet · joins any CV printing this in full${
+        onTimeline(entry) ? ", and the timeline" : ""
+      }`,
+    };
+  const places = others(use(entry.id)?.bullets[line.id]);
+  const bullet = entry.bullets?.find((b) => b.id === line.id);
+  if (onTimeline(entry) && bullet?.timeline !== false)
+    places.push("the timeline");
+  return shared(places);
+});
 
 // In paged mode each sheet clips, so measure how much would be cut off.
 const previewEl = ref<HTMLElement | null>(null);
@@ -677,6 +1019,13 @@ async function measureOverflow() {
 
 watch([preview, paged, zoom, showPreview], measureOverflow);
 
+// Typing in the preview changes the sheets without a new preview arriving.
+let measureFrame = 0;
+function measureSoon() {
+  cancelAnimationFrame(measureFrame);
+  measureFrame = requestAnimationFrame(measureOverflow);
+}
+
 // The preview column is exactly as wide as the CV at the current zoom, so
 // the form gets everything else. A4 sheets and the ATS layout are 210mm wide;
 // the continuous styled view is capped at 1050px plus its own 20px gutters.
@@ -695,6 +1044,7 @@ const warnOnUnload = (event: BeforeUnloadEvent) => {
 onMounted(() => {
   window.addEventListener("beforeunload", warnOnUnload);
   theme.value = localStorage.getItem(THEME_KEY) === "site" ? "site" : "light";
+  editText.value = localStorage.getItem(EDIT_KEY) !== "off";
   if (localStorage.getItem(WORKSPACE_KEY) === "cvs") workspace.value = "cvs";
 });
 
@@ -705,6 +1055,7 @@ watch(
     if (!signedIn) {
       state.value = null;
       variant.value = null;
+      discardDrafts();
       return;
     }
     denied.value = "";
@@ -723,6 +1074,7 @@ watch(
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", warnOnUnload);
   window.clearTimeout(previewTimer);
+  cancelAnimationFrame(measureFrame);
 });
 
 onBeforeRouteLeave(
@@ -937,9 +1289,14 @@ onBeforeRouteLeave(
                 <button
                   class="a-btn a-btn--primary"
                   :disabled="busy || !dirty"
+                  :title="
+                    drafts.size
+                      ? 'Saves this CV and the Library text edited in its preview'
+                      : ''
+                  "
                   @click="save"
                 >
-                  Save
+                  {{ saveLabel }}
                 </button>
                 <button
                   class="a-btn a-btn--success"
@@ -1150,25 +1507,56 @@ onBeforeRouteLeave(
           :class="{ 'is-hidden': !showPreview }"
           :style="{ width: previewWidth }"
         >
-          <div class="d-flex gap-2 align-items-center mb-2 no-print">
-            <strong class="small text-dark">Preview</strong>
-            <select
-              v-model.number="zoom"
-              class="form-select form-select-sm w-auto"
+          <div class="cv-admin__preview-bar no-print">
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <strong class="small text-dark">Preview</strong>
+              <select
+                v-model.number="zoom"
+                class="form-select form-select-sm w-auto"
+              >
+                <option :value="0.5">50%</option>
+                <option :value="0.6">60%</option>
+                <option :value="0.75">75%</option>
+                <option :value="1">100%</option>
+              </select>
+              <button class="a-btn" @click="printCv">Print / save PDF</button>
+              <label
+                v-if="(variant.layout ?? 'styled') === 'styled'"
+                class="form-check small mb-0 ms-1"
+              >
+                <input
+                  v-model="paged"
+                  type="checkbox"
+                  class="form-check-input"
+                />
+                A4 pages
+              </label>
+              <label
+                class="form-check small mb-0 ms-1"
+                title="Click any text in the preview to change it. Enter in a bullet starts a new one; Escape puts the text back."
+              >
+                <input
+                  v-model="editText"
+                  type="checkbox"
+                  class="form-check-input"
+                />
+                Edit text
+              </label>
+            </div>
+            <!-- What the text being edited belongs to -->
+            <div
+              v-if="editText"
+              class="cv-admin__scope"
+              :class="{
+                'is-own': textScope?.own,
+                'is-shared': textScope && !textScope.own,
+              }"
             >
-              <option :value="0.5">50%</option>
-              <option :value="0.6">60%</option>
-              <option :value="0.75">75%</option>
-              <option :value="1">100%</option>
-            </select>
-            <button class="a-btn" @click="printCv">Print / save PDF</button>
-            <label
-              v-if="(variant.layout ?? 'styled') === 'styled'"
-              class="form-check small mb-0 ms-1"
-            >
-              <input v-model="paged" type="checkbox" class="form-check-input" />
-              A4 pages
-            </label>
+              {{
+                textScope?.text ??
+                "Click any text to edit it. Changes wait for Save."
+              }}
+            </div>
           </div>
           <div ref="previewEl" class="cv-admin__zoom" :style="{ zoom }">
             <template v-if="preview.length">
@@ -1457,6 +1845,37 @@ onBeforeRouteLeave(
 .cv-admin__preview {
   background: var(--ad-preview-bg);
   max-width: 100%;
+}
+
+// Stays in view while the sheets scroll under it, since it says what the
+// text being edited belongs to.
+.cv-admin__preview-bar {
+  position: sticky;
+  top: -1rem;
+  z-index: 2;
+  margin: -1rem -1rem 0.5rem;
+  padding: 1rem 1rem 0.5rem;
+  background: var(--ad-preview-bg);
+}
+
+.cv-admin__scope {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--ad-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &.is-own,
+  &.is-shared {
+    font-weight: 600;
+  }
+  &.is-own {
+    color: var(--ad-success);
+  }
+  &.is-shared {
+    color: var(--ad-warn-text);
+  }
 }
 
 // The sign-in card (and the loading line) before the dashboard appears.

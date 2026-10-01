@@ -157,7 +157,10 @@ function eachRef(variant, fn) {
 // section; everything after a break lands on the next sheet, whichever
 // column it belongs to, and the sheet after a mid-section break repeats that
 // section's heading as "(continued)". The result is one CVPage per sheet.
-function resolveVariant(library, variant) {
+// With `trace`, each page also carries `src`: the library ids behind every
+// piece of text, in the same order, so the dashboard's preview can be edited
+// in place. Never set when publishing.
+function resolveVariant(library, variant, { trace = false } = {}) {
   const byId = new Map(library.entries.map((e) => [e.id, e]));
   const where = `variant "${variant.id}"`;
 
@@ -181,27 +184,38 @@ function resolveVariant(library, variant) {
     return { entry, ref };
   };
 
-  // The texts of the listed ids, in that order; with `condensed`, the
-  // entry's highlights for this CV (falling back to the full bullets when it
-  // has none); all the bullets if neither. Listed ids may name highlights
-  // too, but those are never part of the default.
-  const pickBullets = (entry, ids, condensed) => {
+  // The listed ids, in that order; with `condensed`, the entry's highlights
+  // for this CV (falling back to the full bullets when it has none); all the
+  // bullets if neither. Listed ids may name highlights too, but those are
+  // never part of the default. Each row is its text and where it came from.
+  const pickRows = (entry, ids, condensed) => {
     const bullets = entry.bullets || [];
+    const highlights = entry.highlights || [];
+    const row = (b) => {
+      const src = { entry: entry.id, id: b.id };
+      if (highlights.includes(b)) {
+        src.highlight = true;
+        if (b.for) src.for = b.for;
+      }
+      return { text: b.text, src };
+    };
     if (condensed && !ids) {
       const set = highlightsFor(entry, variant.id);
-      return (set.length ? set : bullets).map((b) => b.text);
+      return (set.length ? set : bullets).map(row);
     }
-    if (!ids) return bullets.map((b) => b.text);
-    const known = [...bullets, ...(entry.highlights || [])];
+    if (!ids) return bullets.map(row);
+    const known = [...bullets, ...highlights];
     return ids.map((bulletId) => {
       const bullet = known.find((b) => b.id === bulletId);
       if (!bullet)
         throw new Error(
           `${where}: unknown bullet "${bulletId}" on "${entry.id}"`
         );
-      return bullet.text;
+      return row(bullet);
     });
   };
+  const texts = (rows) => rows.map((r) => r.text);
+  const sources = (rows) => rows.map((r) => r.src);
 
   // Engagements under a job, newest first. Undated ones keep file order.
   const engagementsOf = (job) =>
@@ -280,6 +294,8 @@ function resolveVariant(library, variant) {
     if (sheet.continued.size) out.continued = [...sheet.continued];
 
     const items = (section) => sheet.items[section] || [];
+    const ids = (section) => items(section).map(({ entry }) => entry.id);
+    const src = {};
     for (const section of sheet.order) {
       if (section === "education") {
         out.education = items(section).map(({ entry }) => ({
@@ -288,22 +304,31 @@ function resolveVariant(library, variant) {
           dates: formatRange(entry),
           details: entry.details,
         }));
+        src.education = ids(section);
       } else if (section === "competencies") {
         out.competencies = items(section).map(({ entry }) => entry.title);
+        src.competencies = ids(section);
       } else if (section === "achievements") {
         out.achievements = items(section).map(({ entry }) => ({
           role: entry.title,
           org: entry.org,
           note: entry.details,
         }));
+        src.achievements = ids(section);
       } else if (section === "skills") {
         // Grouped by category, in the order categories first appear.
         out.skills = {};
+        src.skills = {};
         for (const { entry } of items(section)) {
-          if (!out.skills[entry.category]) out.skills[entry.category] = [];
+          if (!out.skills[entry.category]) {
+            out.skills[entry.category] = [];
+            src.skills[entry.category] = [];
+          }
           out.skills[entry.category].push(entry.title);
+          src.skills[entry.category].push(entry.id);
         }
       } else if (section === "experience") {
+        src.experience = [];
         out.experience = items(section).map(({ entry, ref }) => {
           if (
             typeof ref !== "string" &&
@@ -312,16 +337,11 @@ function resolveVariant(library, variant) {
           ) {
             throw new Error(`${where}: "condensed" must be a boolean`);
           }
-          const job = {
-            title: entry.title,
-            company: entry.org,
-            dates: formatRange(entry),
-            details: pickBullets(
-              entry,
-              typeof ref === "string" ? undefined : ref.bullets,
-              typeof ref !== "string" && ref.condensed
-            ),
-          };
+          const rows = pickRows(
+            entry,
+            typeof ref === "string" ? undefined : ref.bullets,
+            typeof ref !== "string" && ref.condensed
+          );
           const own = engagementsOf(entry);
           const picks = typeof ref === "string" ? undefined : ref.engagements;
           if (picks && typeof picks === "object") {
@@ -333,22 +353,36 @@ function resolveVariant(library, variant) {
             }
           }
           const engagements = [];
+          const engagementSrc = [];
           for (const eng of own) {
             const pick = engagementPick(ref, eng.id, where);
             if (pick.show) {
+              const engRows = pickRows(eng, pick.bullets, pick.condensed);
               engagements.push({
                 client: eng.title,
                 dates: formatRange(eng),
-                details: pickBullets(eng, pick.bullets, pick.condensed),
+                details: texts(engRows),
               });
+              engagementSrc.push({ id: eng.id, details: sources(engRows) });
             } else if (pick.condensed) {
               // Hidden block, condensed: its highlights roll up under the job.
-              job.details.push(...pickBullets(eng, undefined, true));
+              rows.push(...pickRows(eng, undefined, true));
             } else if (pick.bullets && pick.bullets.length) {
-              job.details.push(...pickBullets(eng, pick.bullets));
+              rows.push(...pickRows(eng, pick.bullets));
             }
           }
-          if (engagements.length) job.engagements = engagements;
+          const job = {
+            title: entry.title,
+            company: entry.org,
+            dates: formatRange(entry),
+            details: texts(rows),
+          };
+          const jobSrc = { id: entry.id, details: sources(rows) };
+          if (engagements.length) {
+            job.engagements = engagements;
+            jobSrc.engagements = engagementSrc;
+          }
+          src.experience.push(jobSrc);
           return job;
         });
       } else if (section === "interests") {
@@ -356,14 +390,21 @@ function resolveVariant(library, variant) {
           name: entry.title,
           desc: entry.details,
         }));
+        src.interests = ids(section);
       } else if (section === "projects") {
         out.projects = items(section).map(({ entry }) => ({
           title: entry.title,
           desc: entry.details || entry.tagline,
           tech: joinTech(entry.tech),
         }));
+        // The blurb falls back to the site card's tagline.
+        src.projects = items(section).map(({ entry }) => ({
+          id: entry.id,
+          desc: entry.details ? "details" : "tagline",
+        }));
       }
     }
+    if (trace) out.src = src;
     return out;
   });
 }

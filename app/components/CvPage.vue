@@ -1,8 +1,18 @@
 <script setup lang="ts">
 import type { PropType } from "vue";
-import { computed } from "vue";
+import { computed, inject } from "vue";
+import CvText from "@/components/CvText.vue";
 import type { CVPage, SectionName } from "@/cv/types";
 import { SIDEBAR_SECTIONS } from "@/cv/types";
+import {
+  CV_SUMMARY,
+  CV_TITLE,
+  entryText,
+  INLINE_EDIT,
+  lineText,
+  opens,
+  PROFILE,
+} from "@/cv/inlineEdit";
 
 // One CV page: sidebar plus main column, rendering sections in the order the
 // variant chose. The name and contact block only appears on the first sheet.
@@ -19,6 +29,17 @@ const mainSections = computed(() =>
 );
 const cont = (s: SectionName) =>
   props.page.continued?.includes(s) ? " (continued)" : "";
+
+// Where each text comes from, in the dashboard's preview (see CvText). A
+// published page has no `src`, so on the site all of this is plain text.
+const src = computed(() => props.page.src);
+const editor = inject(INLINE_EDIT, null);
+// The contact links open the profile instead while the preview is editable.
+function onContact(event: Event) {
+  if (!editor?.enabled.value) return;
+  event.preventDefault();
+  editor.open(PROFILE);
+}
 </script>
 
 <template>
@@ -26,26 +47,37 @@ const cont = (s: SectionName) =>
     <aside class="sidebar">
       <div v-if="first" class="sidebar-personal-info">
         <div class="profile-header">
-          <h1>{{ page.profile.name }}</h1>
-          <h2>{{ page.profile.title }}</h2>
+          <CvText tag="h1" :value="page.profile.name" :src="PROFILE" />
+          <CvText tag="h2" :value="page.profile.title" :src="CV_TITLE" />
         </div>
 
         <div class="contact-box">
-          <div v-if="page.profile.location" class="contact-item">
-            {{ page.profile.location }}
-          </div>
-          <div v-if="page.profile.phone" class="contact-item">
-            {{ page.profile.phone }}
-          </div>
+          <CvText
+            v-if="page.profile.location"
+            tag="div"
+            class="contact-item"
+            :value="page.profile.location"
+            :src="PROFILE"
+          />
+          <CvText
+            v-if="page.profile.phone"
+            tag="div"
+            class="contact-item"
+            :value="page.profile.phone"
+            :src="PROFILE"
+          />
           <div class="contact-item">
-            <a :href="`mailto:${page.profile.email}`">{{
+            <a :href="`mailto:${page.profile.email}`" @click="onContact">{{
               page.profile.email
             }}</a>
           </div>
           <div class="contact-item">
-            <a :href="`https://${page.profile.website}`" target="_blank">{{
-              page.profile.website
-            }}</a>
+            <a
+              :href="`https://${page.profile.website}`"
+              target="_blank"
+              @click="onContact"
+              >{{ page.profile.website }}</a
+            >
           </div>
         </div>
       </div>
@@ -54,25 +86,40 @@ const cont = (s: SectionName) =>
         <div v-if="s === 'education'" class="sidebar-section">
           <div class="sidebar-title">Education{{ cont(s) }}</div>
           <div v-for="(edu, i) in page.education" :key="i" class="sidebar-item">
-            <span class="sidebar-item-title">{{ edu.degree }}</span>
-            <span class="sidebar-item-sub">{{ edu.uni }}</span>
-            <span v-if="edu.details" class="sidebar-item-date">{{
-              edu.details
-            }}</span>
-            <span class="sidebar-item-date">{{ edu.dates }}</span>
+            <CvText
+              class="sidebar-item-title"
+              :value="edu.degree"
+              :src="entryText(src?.education?.[i], 'title')"
+            />
+            <CvText
+              class="sidebar-item-sub"
+              :value="edu.uni"
+              :src="entryText(src?.education?.[i], 'org')"
+            />
+            <CvText
+              v-if="edu.details"
+              class="sidebar-item-date"
+              :value="edu.details"
+              :src="entryText(src?.education?.[i], 'details')"
+            />
+            <CvText
+              class="sidebar-item-date"
+              :value="edu.dates"
+              :src="opens(src?.education?.[i])"
+            />
           </div>
         </div>
 
         <div v-else-if="s === 'competencies'" class="sidebar-section">
           <div class="sidebar-title">Notable Competencies{{ cont(s) }}</div>
           <div class="pill-container">
-            <span
+            <CvText
               v-for="(comp, i) in page.competencies"
               :key="i"
               class="sidebar-pill"
-            >
-              {{ comp }}
-            </span>
+              :value="comp"
+              :src="entryText(src?.competencies?.[i], 'title')"
+            />
           </div>
         </div>
 
@@ -83,30 +130,52 @@ const cont = (s: SectionName) =>
             :key="i"
             class="sidebar-item"
           >
-            <span class="sidebar-item-title">{{ lead.role }}</span>
-            <span class="sidebar-item-sub">{{ lead.org }}</span>
-            <span v-if="lead.note" class="sidebar-item-date">{{
-              lead.note
-            }}</span>
+            <CvText
+              class="sidebar-item-title"
+              :value="lead.role"
+              :src="entryText(src?.achievements?.[i], 'title')"
+            />
+            <CvText
+              class="sidebar-item-sub"
+              :value="lead.org"
+              :src="entryText(src?.achievements?.[i], 'org')"
+            />
+            <CvText
+              v-if="lead.note"
+              class="sidebar-item-date"
+              :value="lead.note"
+              :src="entryText(src?.achievements?.[i], 'details')"
+            />
           </div>
         </div>
 
         <div v-else-if="s === 'interests'" class="sidebar-section">
           <div class="sidebar-title">Interests & Passions{{ cont(s) }}</div>
           <div v-for="(int, i) in page.interests" :key="i" class="sidebar-item">
-            <span class="sidebar-item-title">{{ int.name }}</span>
-            <span class="sidebar-item-date">{{ int.desc }}</span>
+            <CvText
+              class="sidebar-item-title"
+              :value="int.name"
+              :src="entryText(src?.interests?.[i], 'title')"
+            />
+            <CvText
+              class="sidebar-item-date"
+              :value="int.desc"
+              :src="entryText(src?.interests?.[i], 'details')"
+            />
           </div>
         </div>
       </template>
     </aside>
 
     <main class="main-content">
-      <p
+      <CvText
         v-if="page.profile.summary"
+        tag="p"
         class="summary"
-        v-html="page.profile.summary"
-      ></p>
+        html
+        :value="page.profile.summary"
+        :src="CV_SUMMARY"
+      />
 
       <template v-for="s in mainSections" :key="s">
         <div v-if="s === 'skills'">
@@ -118,12 +187,13 @@ const cont = (s: SectionName) =>
               class="skill-category"
             >
               <span class="cat-name">{{ category }}</span>
-              <span
-                v-for="skill in skillsList"
-                :key="skill"
+              <CvText
+                v-for="(skill, k) in skillsList"
+                :key="k"
                 class="skill-pill"
-                >{{ skill }}</span
-              >
+                :value="skill"
+                :src="entryText(src?.skills?.[category]?.[k], 'title')"
+              />
             </div>
           </div>
         </div>
@@ -137,18 +207,40 @@ const cont = (s: SectionName) =>
           >
             <div class="job-header">
               <div>
-                <span class="job-title">{{ job.title }}</span>
-                <span class="company"> // {{ job.company }}</span>
+                <CvText
+                  class="job-title"
+                  :value="job.title"
+                  :src="entryText(src?.experience?.[i]?.id, 'title')"
+                />
+                <span class="company">
+                  //
+                  <CvText
+                    :value="job.company"
+                    :src="entryText(src?.experience?.[i]?.id, 'org')"
+                  />
+                </span>
               </div>
-              <span class="dates">{{ job.dates }}</span>
+              <CvText
+                class="dates"
+                :value="job.dates"
+                :src="opens(src?.experience?.[i]?.id)"
+              />
             </div>
             <div class="job-details">
               <ul>
-                <li
+                <CvText
                   v-for="(detail, d) in job.details"
                   :key="d"
-                  v-html="detail"
-                ></li>
+                  tag="li"
+                  html
+                  :value="detail"
+                  :src="
+                    lineText(
+                      src?.experience?.[i]?.id,
+                      src?.experience?.[i]?.details[d]
+                    )
+                  "
+                />
               </ul>
             </div>
             <div
@@ -157,16 +249,38 @@ const cont = (s: SectionName) =>
               class="engagement"
             >
               <div class="engagement-header">
-                <span class="engagement-client">{{ eng.client }}</span>
-                <span v-if="eng.dates" class="dates">{{ eng.dates }}</span>
+                <CvText
+                  class="engagement-client"
+                  :value="eng.client"
+                  :src="
+                    entryText(
+                      src?.experience?.[i]?.engagements?.[e]?.id,
+                      'title'
+                    )
+                  "
+                />
+                <CvText
+                  v-if="eng.dates"
+                  class="dates"
+                  :value="eng.dates"
+                  :src="opens(src?.experience?.[i]?.engagements?.[e]?.id)"
+                />
               </div>
               <div v-if="eng.details.length" class="job-details">
                 <ul>
-                  <li
+                  <CvText
                     v-for="(detail, d) in eng.details"
                     :key="d"
-                    v-html="detail"
-                  ></li>
+                    tag="li"
+                    html
+                    :value="detail"
+                    :src="
+                      lineText(
+                        src?.experience?.[i]?.id,
+                        src?.experience?.[i]?.engagements?.[e]?.details[d]
+                      )
+                    "
+                  />
                 </ul>
               </div>
             </div>
@@ -181,9 +295,27 @@ const cont = (s: SectionName) =>
               :key="i"
               class="project-card"
             >
-              <span class="project-title">{{ proj.title }}</span>
-              <p class="project-desc">{{ proj.desc }}</p>
-              <span class="project-tech">{{ proj.tech }}</span>
+              <CvText
+                class="project-title"
+                :value="proj.title"
+                :src="entryText(src?.projects?.[i]?.id, 'title')"
+              />
+              <CvText
+                tag="p"
+                class="project-desc"
+                :value="proj.desc"
+                :src="
+                  entryText(
+                    src?.projects?.[i]?.id,
+                    src?.projects?.[i]?.desc ?? 'details'
+                  )
+                "
+              />
+              <CvText
+                class="project-tech"
+                :value="proj.tech"
+                :src="opens(src?.projects?.[i]?.id)"
+              />
             </div>
           </div>
         </div>

@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import type { PropType } from "vue";
 import { computed } from "vue";
+import CvText from "@/components/CvText.vue";
 import type { CVPage } from "@/cv/types";
+import {
+  CV_SUMMARY,
+  CV_TITLE,
+  entryText,
+  lineText,
+  opens,
+  PROFILE,
+} from "@/cv/inlineEdit";
 import { mergePages } from "@/cv/merge";
 import { usePrintPage } from "@/cv/usePrintPage";
 
@@ -17,6 +26,8 @@ usePrintPage("size: A4; margin: 18mm 20mm;");
 
 const page = computed(() => mergePages(props.pages));
 const profile = computed(() => page.value?.profile);
+// Where each text comes from, in the dashboard's preview (see CvText).
+const src = computed(() => page.value?.src);
 
 const contactLine = computed(() =>
   [
@@ -33,28 +44,57 @@ const contactLine = computed(() =>
 <template>
   <div v-if="page && profile" class="ats">
     <header class="ats__header">
-      <h1>{{ profile.name }}</h1>
-      <p class="ats__headline">{{ profile.title }}</p>
-      <p class="ats__contact">{{ contactLine }}</p>
+      <CvText tag="h1" :value="profile.name" :src="PROFILE" />
+      <CvText
+        tag="p"
+        class="ats__headline"
+        :value="profile.title"
+        :src="CV_TITLE"
+      />
+      <CvText
+        tag="p"
+        class="ats__contact"
+        :value="contactLine"
+        :src="PROFILE"
+      />
     </header>
 
     <section v-if="profile.summary">
       <h2>Summary</h2>
-      <p v-html="profile.summary"></p>
+      <CvText tag="p" html :value="profile.summary" :src="CV_SUMMARY" />
     </section>
 
     <template v-for="s in page.sections" :key="s">
       <section v-if="s === 'experience' && page.experience?.length">
         <h2>Experience</h2>
         <article v-for="(job, i) in page.experience" :key="i" class="ats__item">
-          <h3>{{ job.title }}</h3>
-          <p class="ats__meta">{{ job.company }} | {{ job.dates }}</p>
+          <CvText
+            tag="h3"
+            :value="job.title"
+            :src="entryText(src?.experience?.[i]?.id, 'title')"
+          />
+          <p class="ats__meta">
+            <CvText
+              :value="job.company"
+              :src="entryText(src?.experience?.[i]?.id, 'org')"
+            />
+            |
+            <CvText :value="job.dates" :src="opens(src?.experience?.[i]?.id)" />
+          </p>
           <ul>
-            <li
+            <CvText
               v-for="(detail, d) in job.details"
               :key="d"
-              v-html="detail"
-            ></li>
+              tag="li"
+              html
+              :value="detail"
+              :src="
+                lineText(
+                  src?.experience?.[i]?.id,
+                  src?.experience?.[i]?.details[d]
+                )
+              "
+            />
           </ul>
           <div
             v-for="(eng, e) in job.engagements"
@@ -62,15 +102,35 @@ const contactLine = computed(() =>
             class="ats__engagement"
           >
             <p class="ats__meta">
-              <strong>{{ eng.client }}</strong>
-              <template v-if="eng.dates"> | {{ eng.dates }}</template>
+              <CvText
+                tag="strong"
+                :value="eng.client"
+                :src="
+                  entryText(src?.experience?.[i]?.engagements?.[e]?.id, 'title')
+                "
+              />
+              <template v-if="eng.dates">
+                |
+                <CvText
+                  :value="eng.dates"
+                  :src="opens(src?.experience?.[i]?.engagements?.[e]?.id)"
+                />
+              </template>
             </p>
             <ul v-if="eng.details.length">
-              <li
+              <CvText
                 v-for="(detail, d) in eng.details"
                 :key="d"
-                v-html="detail"
-              ></li>
+                tag="li"
+                html
+                :value="detail"
+                :src="
+                  lineText(
+                    src?.experience?.[i]?.id,
+                    src?.experience?.[i]?.engagements?.[e]?.details[d]
+                  )
+                "
+              />
             </ul>
           </div>
         </article>
@@ -79,39 +139,102 @@ const contactLine = computed(() =>
       <section v-else-if="s === 'education' && page.education?.length">
         <h2>Education</h2>
         <article v-for="(edu, i) in page.education" :key="i" class="ats__item">
-          <h3>{{ edu.degree }}</h3>
-          <p class="ats__meta">{{ edu.uni }} | {{ edu.dates }}</p>
-          <p v-if="edu.details">{{ edu.details }}</p>
+          <CvText
+            tag="h3"
+            :value="edu.degree"
+            :src="entryText(src?.education?.[i], 'title')"
+          />
+          <p class="ats__meta">
+            <CvText
+              :value="edu.uni"
+              :src="entryText(src?.education?.[i], 'org')"
+            />
+            |
+            <CvText :value="edu.dates" :src="opens(src?.education?.[i])" />
+          </p>
+          <CvText
+            v-if="edu.details"
+            tag="p"
+            :value="edu.details"
+            :src="entryText(src?.education?.[i], 'details')"
+          />
         </article>
       </section>
 
       <section v-else-if="s === 'skills' && page.skills">
         <h2>Skills</h2>
         <p v-for="(list, category) in page.skills" :key="category">
-          <strong>{{ category }}:</strong> {{ list.join(", ") }}
+          <strong>{{ category }}:</strong>
+          <template v-for="(skill, k) in list" :key="k">
+            <span>{{ k ? ", " : " " }}</span>
+            <CvText
+              :value="skill"
+              :src="entryText(src?.skills?.[category]?.[k], 'title')"
+            />
+          </template>
         </p>
       </section>
 
       <section v-else-if="s === 'competencies' && page.competencies?.length">
         <h2>Core Competencies</h2>
-        <p>{{ page.competencies.join(", ") }}</p>
+        <p>
+          <template v-for="(comp, i) in page.competencies" :key="i">
+            <CvText
+              :value="comp"
+              :src="entryText(src?.competencies?.[i], 'title')"
+            /><span v-if="i < page.competencies.length - 1">, </span>
+          </template>
+        </p>
       </section>
 
       <section v-else-if="s === 'projects' && page.projects?.length">
         <h2>Projects</h2>
         <article v-for="(proj, i) in page.projects" :key="i" class="ats__item">
-          <h3>{{ proj.title }}</h3>
-          <p v-if="proj.tech" class="ats__meta">{{ proj.tech }}</p>
-          <p>{{ proj.desc }}</p>
+          <CvText
+            tag="h3"
+            :value="proj.title"
+            :src="entryText(src?.projects?.[i]?.id, 'title')"
+          />
+          <CvText
+            v-if="proj.tech"
+            tag="p"
+            class="ats__meta"
+            :value="proj.tech"
+            :src="opens(src?.projects?.[i]?.id)"
+          />
+          <CvText
+            tag="p"
+            :value="proj.desc"
+            :src="
+              entryText(
+                src?.projects?.[i]?.id,
+                src?.projects?.[i]?.desc ?? 'details'
+              )
+            "
+          />
         </article>
       </section>
 
       <section v-else-if="s === 'achievements' && page.achievements?.length">
         <h2>Achievements</h2>
         <article v-for="(a, i) in page.achievements" :key="i" class="ats__item">
-          <h3>{{ a.role }}</h3>
-          <p class="ats__meta">{{ a.org }}</p>
-          <p v-if="a.note">{{ a.note }}</p>
+          <CvText
+            tag="h3"
+            :value="a.role"
+            :src="entryText(src?.achievements?.[i], 'title')"
+          />
+          <CvText
+            tag="p"
+            class="ats__meta"
+            :value="a.org"
+            :src="entryText(src?.achievements?.[i], 'org')"
+          />
+          <CvText
+            v-if="a.note"
+            tag="p"
+            :value="a.note"
+            :src="entryText(src?.achievements?.[i], 'details')"
+          />
         </article>
       </section>
 
@@ -119,8 +242,15 @@ const contactLine = computed(() =>
         <h2>Interests</h2>
         <p>
           <template v-for="(int, i) in page.interests" :key="i">
-            <strong>{{ int.name }}</strong
-            ><span v-if="int.desc"> ({{ int.desc }})</span
+            <CvText
+              tag="strong"
+              :value="int.name"
+              :src="entryText(src?.interests?.[i], 'title')"
+            /><template v-if="int.desc">
+              (<CvText
+                :value="int.desc"
+                :src="entryText(src?.interests?.[i], 'details')"
+              />)</template
             ><span v-if="i < page.interests.length - 1">, </span>
           </template>
         </p>

@@ -86,6 +86,21 @@ With the emulators, the server mode can use a local model too: put
 `functions/.secret.local` (both ignored by git). `npm --prefix functions test`
 covers the prompt, the reply parser and the API route.
 
+### Editing in the preview
+
+Under CVs, with the preview shown and **Edit text** ticked, any text in the
+preview can be typed into, so the sheet reflows and the overflow warning
+updates as you write. Enter in a bullet starts a new one below it; Escape
+puts the text back. The line above the preview says what the text belongs
+to: the headline and summary are the CV's own, everything else is Library
+text shared with the other CVs and the timeline. Condensed bullets always
+end up in that CV's own set: editing one from the general set (or another
+CV's) copies it for this CV first. Dates, tech and contact details open
+their editor instead. Nothing is written until **Save**, which sends the CV
+and the edited entries in one request (`POST save`); Revert discards both.
+The function's preview carries the library ids behind each text
+(`resolveVariant(..., { trace: true })`); published pages never do.
+
 Deploy everything (site, the `cvApi` function, Firestore rules) with
 `npm run deploy`. It names the function on purpose: the project still holds
 two old functions (`api` and `uwibase` in us-central1) that are not in this

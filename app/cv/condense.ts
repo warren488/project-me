@@ -1,3 +1,4 @@
+import { rowId } from "./ids";
 import type { Highlight, LibraryEntry } from "./types";
 
 // The browser side of "Condense". The prompt is built by the server
@@ -164,28 +165,19 @@ export async function completeLocally(
 export const promptText = (prompt: CondensePrompt) =>
   `${prompt.system}\n\n---\n\n${prompt.user}`;
 
-const slug = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/<[^>]+>/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
 // Ids for accepted proposals: like bullet ids, marked `-hl-`, unique across
 // the entry's bullets and highlights and among themselves.
 export function highlightIds(entry: LibraryEntry, texts: string[]): string[] {
-  const base = entry.id.replace(/^[a-z]+-/, "");
   const taken = new Set([
     ...(entry.bullets ?? []).map((b) => b.id),
     ...(entry.highlights ?? []).map((h) => h.id),
   ]);
   return texts.map((text) => {
-    const words = slug(text.split(/\s+/).slice(0, 3).join(" "));
-    const stem = `${base}-hl-${words}`.replace(/-+$/, "");
-    let candidate = stem;
-    for (let n = 2; taken.has(candidate); n++) candidate = `${stem}-${n}`;
-    taken.add(candidate);
-    return candidate;
+    const id = rowId(entry.id, text, "-hl", (candidate) =>
+      taken.has(candidate)
+    );
+    taken.add(id);
+    return id;
   });
 }
 

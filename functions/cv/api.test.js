@@ -207,7 +207,7 @@ test("a variant may pick highlights by id; saving the entry keeps them; removing
   const put = await call(handler, "PUT", "/api/cv/variants/full", variant);
   assert.equal(put.status, 200, JSON.stringify(put.body));
 
-  const preview = await call(handler, "POST", "/api/cv/preview", variant);
+  const preview = await call(handler, "POST", "/api/cv/preview", { variant: variant });
   assert.equal(preview.status, 200);
   const job = preview.body.pages[0].experience[0];
   assert.deepEqual(job.details, ["Job bullet"]);
@@ -257,12 +257,12 @@ test("a condensed pick resolves to the CV's own set, else general, else the full
   const store = memoryStore(lib, [full, ats]);
   const handler = createHandler({ store, prefix: "/api/cv" });
 
-  const onFull = await call(handler, "POST", "/api/cv/preview", full);
+  const onFull = await call(handler, "POST", "/api/cv/preview", { variant: full });
   assert.equal(onFull.status, 200, JSON.stringify(onFull.body));
   assert.deepEqual(onFull.body.pages[0].experience[0].details, ["RAD for full"]);
   assert.deepEqual(onFull.body.pages[0].experience[0].engagements[0].details, ["For the full CV"]);
 
-  const onAts = await call(handler, "POST", "/api/cv/preview", ats);
+  const onAts = await call(handler, "POST", "/api/cv/preview", { variant: ats });
   // RAD has no ATS set and no general one: the full bullets print.
   assert.deepEqual(onAts.body.pages[0].experience[0].details, ["Job bullet"]);
   // OVO falls back to its general highlight.
@@ -274,17 +274,144 @@ test("a condensed pick resolves to the CV's own set, else general, else the full
   assert.deepEqual(state.body.usage["eng-ovo"].bullets, { "ovo-hl-full": ["full"], "ovo-hl-gen": ["ats"] });
   const dropped = await call(handler, "PUT", "/api/cv/entries/eng-ovo", { ...ovo, highlights: [] });
   assert.equal(dropped.status, 200, JSON.stringify(dropped.body));
-  const after = await call(handler, "POST", "/api/cv/preview", full);
+  const after = await call(handler, "POST", "/api/cv/preview", { variant: full });
   assert.deepEqual(after.body.pages[0].experience[0].engagements[0].details, ["Did A", "Did B"]);
 
   // A hidden, condensed engagement rolls its set up under the job.
   const rolled = { ...full, sections: [{ section: "experience", refs: [{ id: "job-rad", engagements: { "eng-ovo": { show: false, condensed: true } } }] }] };
   await call(handler, "PUT", "/api/cv/entries/eng-ovo", ovo);
-  const rolledUp = await call(handler, "POST", "/api/cv/preview", rolled);
+  const rolledUp = await call(handler, "POST", "/api/cv/preview", { variant: rolled });
   assert.deepEqual(rolledUp.body.pages[0].experience[0].details, ["Job bullet", "For the full CV"]);
   assert.equal(rolledUp.body.pages[0].experience[0].engagements, undefined);
 
-  const bad = await call(handler, "POST", "/api/cv/preview", { ...full, sections: [{ section: "experience", refs: [{ id: "job-rad", condensed: "yes" }] }] });
+  const bad = await call(handler, "POST", "/api/cv/preview", { variant: { ...full, sections: [{ section: "experience", refs: [{ id: "job-rad", condensed: "yes" }] }] } });
   assert.equal(bad.status, 400);
   assert.match(bad.body.error, /"condensed" must be a boolean/);
+});
+
+test("the preview names the source of every text; published output never does", async () => {
+  const ovo = {
+    ...library.entries[1],
+    highlights: [
+      { id: "ovo-hl-full", text: "For the full CV", for: "full" },
+      { id: "ovo-hl-gen", text: "General one" },
+    ],
+  };
+  const lib = { ...library, entries: [library.entries[0], ovo, library.entries[2]] };
+  const variant = {
+    ...fullVariant,
+    sections: [
+      { section: "education", refs: ["edu-x"] },
+      {
+        section: "experience",
+        refs: [{ id: "job-rad", engagements: { "eng-ovo": { show: false, bullets: ["ovo-b", "ovo-hl-gen"] } } }],
+      },
+    ],
+  };
+  const store = memoryStore(lib, [variant]);
+  const handler = createHandler({ store, prefix: "/api/cv" });
+  const preview = await call(handler, "POST", "/api/cv/preview", { variant });
+  assert.equal(preview.status, 200, JSON.stringify(preview.body));
+  assert.deepEqual(preview.body.pages[0].src, {
+    education: ["edu-x"],
+    experience: [
+      {
+        id: "job-rad",
+        // Rolled-up lines keep the engagement they came from.
+        details: [
+          { entry: "job-rad", id: "rad-one" },
+          { entry: "eng-ovo", id: "ovo-b" },
+          { entry: "eng-ovo", id: "ovo-hl-gen", highlight: true },
+        ],
+      },
+    ],
+  });
+
+  const condensed = { ...variant, sections: [{ section: "experience", refs: [{ id: "job-rad", engagements: { "eng-ovo": { condensed: true } } }] }] };
+  const shown = await call(handler, "POST", "/api/cv/preview", { variant: condensed });
+  assert.deepEqual(shown.body.pages[0].src.experience[0].engagements, [
+    { id: "eng-ovo", details: [{ entry: "eng-ovo", id: "ovo-hl-full", highlight: true, for: "full" }] },
+  ]);
+
+  const published = await call(handler, "POST", "/api/cv/publish/full");
+  assert.equal(published.status, 200, JSON.stringify(published.body));
+  const site = await store.readSite();
+  assert.ok(site.published.styled.pages.length);
+  for (const page of site.published.styled.pages) assert.equal(page.src, undefined);
+});
+
+test("the preview resolves over unsaved entries without storing them", async () => {
+  const store = memoryStore(JSON.parse(JSON.stringify(library)), [fullVariant]);
+  const handler = createHandler({ store, prefix: "/api/cv" });
+  const rad = library.entries[0];
+  const draft = {
+    ...rad,
+    title: "Lead engineer",
+    bullets: [...rad.bullets, { id: "rad-new", text: " A new line ", tags: [] }],
+  };
+  const preview = await call(handler, "POST", "/api/cv/preview", { variant: fullVariant, entries: [draft] });
+  assert.equal(preview.status, 200, JSON.stringify(preview.body));
+  const job = preview.body.pages[0].experience[0];
+  assert.equal(job.title, "Lead engineer");
+  assert.deepEqual(job.details, ["Job bullet", "A new line"]);
+  assert.equal(store.current().entries[0].title, "Engineer");
+
+  const unknown = await call(handler, "POST", "/api/cv/preview", { variant: fullVariant, entries: [{ ...draft, id: "job-nope" }] });
+  assert.equal(unknown.status, 400);
+  assert.match(unknown.body.error, /No entry "job-nope"/);
+  const empty = await call(handler, "POST", "/api/cv/preview", { variant: fullVariant, entries: [{ ...rad, bullets: [{ id: "rad-one", text: " " }] }] });
+  assert.equal(empty.status, 400);
+  assert.match(empty.body.error, /has no text/);
+  const none = await call(handler, "POST", "/api/cv/preview", fullVariant);
+  assert.equal(none.status, 400);
+  assert.match(none.body.error, /No variant/);
+});
+
+test("POST save writes the entries and the variant together, or nothing", async () => {
+  const other = { id: "ats", name: "ATS", title: "Any", sections: [{ section: "experience", refs: [{ id: "job-rad", bullets: ["rad-one"] }] }] };
+  const store = memoryStore(JSON.parse(JSON.stringify(library)), [fullVariant, other]);
+  const handler = createHandler({ store, prefix: "/api/cv" });
+  const rad = library.entries[0];
+  const draft = {
+    ...rad,
+    bullets: [{ id: "rad-one", text: "Job bullet, reworded", tags: [] }, { id: "rad-new", text: "A new line", tags: [] }],
+    highlights: [{ id: "rad-hl-one", text: "Short", for: "full" }],
+  };
+  const variant = { ...fullVariant, title: "Staff engineer", sections: [{ section: "experience", refs: [{ id: "job-rad", bullets: ["rad-new", "rad-one"] }] }] };
+
+  // A variant that doesn't resolve stops the entries being written too.
+  const bad = await call(handler, "POST", "/api/cv/save", {
+    variant: { ...variant, sections: [{ section: "experience", refs: [{ id: "job-rad", bullets: ["rad-gone"] }] }] },
+    entries: [draft],
+  });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /unknown bullet "rad-gone"/);
+  assert.equal(store.current().entries[0].bullets.length, 1);
+  assert.equal((await store.readVariant("full")).title, "Frontend lead");
+
+  // So does an entry that would break another saved variant.
+  const breaking = await call(handler, "POST", "/api/cv/save", {
+    variant: fullVariant,
+    entries: [{ ...rad, bullets: [{ id: "rad-renamed", text: "Job bullet", tags: [] }] }],
+  });
+  assert.equal(breaking.status, 400);
+  assert.match(breaking.body.error, /Variant "ats" uses bullet "rad-one"/);
+  assert.equal(store.current().entries[0].bullets[0].id, "rad-one");
+
+  const saved = await call(handler, "POST", "/api/cv/save", { variant, entries: [draft] });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(saved.body, { ok: true, entries: 1 });
+  assert.deepEqual(store.current().entries[0].bullets.map((b) => b.id), ["rad-one", "rad-new"]);
+  assert.deepEqual(store.current().entries[0].highlights, [{ id: "rad-hl-one", text: "Short", for: "full" }]);
+  assert.equal((await store.readVariant("full")).title, "Staff engineer");
+  // The timeline follows the library, as it does for any entry save.
+  const site = await store.readSite();
+  assert.deepEqual(site.timeline.items.find((i) => i.id === "job-rad").bullets, ["Job bullet, reworded", "A new line"]);
+
+  // With no entries it is a plain variant save and the site is left alone.
+  const before = JSON.stringify(await store.readSite());
+  const plain = await call(handler, "POST", "/api/cv/save", { variant: { ...variant, title: "Principal" } });
+  assert.deepEqual(plain.body, { ok: true, entries: 0 });
+  assert.equal((await store.readVariant("full")).title, "Principal");
+  assert.equal(JSON.stringify(await store.readSite()), before);
 });
