@@ -71,11 +71,39 @@ export interface Interest {
   desc: string;
 }
 
+// Where a printed bullet came from: the entry that holds it (the engagement,
+// for one rolled up under its job) and its id there. Highlights say which CV
+// they were written for; none = general.
+export interface LineSource {
+  entry: string;
+  id: string;
+  highlight?: boolean;
+  for?: string;
+}
+
+// The library ids behind a page's text, item for item in the same order.
+// Only the dashboard's preview carries them, so its text can be edited in
+// place; published pages never do.
+export interface PageSources {
+  education?: string[];
+  competencies?: string[];
+  achievements?: string[];
+  interests?: string[];
+  projects?: { id: string; desc: "details" | "tagline" }[];
+  skills?: Record<string, string[]>;
+  experience?: {
+    id: string;
+    details: LineSource[];
+    engagements?: { id: string; details: LineSource[] }[];
+  }[];
+}
+
 export interface CVPage {
   // Section order on this page, as chosen in the variant.
   sections: SectionName[];
   // Sections that started on an earlier sheet, so their heading is repeated.
   continued?: SectionName[];
+  src?: PageSources;
   profile: {
     name: string;
     title: string;

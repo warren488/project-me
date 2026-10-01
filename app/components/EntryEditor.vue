@@ -14,6 +14,7 @@ import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
 } from "@/cv/types";
+import { rowId, slug } from "@/cv/ids";
 import CondenseDialog from "./CondenseDialog.vue";
 
 // Add / edit one library entry. The parent owns saving; this component only
@@ -81,13 +82,6 @@ const FIELDS: Record<EntryKind, Partial<Record<Field, string>>> = {
   competency: {},
   skill: { category: "Category" },
 };
-
-const slug = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/<[^>]+>/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 
 interface BulletForm {
   id: string;
@@ -218,14 +212,8 @@ const idTaken = (id: string, except: BulletForm | HighlightForm) =>
   form.bullets.some((b) => b !== except && b.id === id) ||
   form.highlights.some((h) => h !== except && h.id === id);
 
-const autoRowId = (row: BulletForm | HighlightForm, mark: string) => {
-  const base = `${form.id.replace(/^[a-z]+-/, "")}${mark}-${slug(
-    row.text.split(/\s+/).slice(0, 3).join(" ")
-  )}`.replace(/-+$/, "");
-  let candidate = base || "bullet";
-  for (let n = 2; idTaken(candidate, row); n++) candidate = `${base}-${n}`;
-  return candidate;
-};
+const autoRowId = (row: BulletForm | HighlightForm, mark: string) =>
+  rowId(form.id, row.text, mark, (id) => idTaken(id, row));
 const bulletAutoId = (bullet: BulletForm) => autoRowId(bullet, "");
 const highlightAutoId = (highlight: HighlightForm) =>
   autoRowId(highlight, "-hl");

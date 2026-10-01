@@ -381,6 +381,67 @@ function createHandler({ store, authorize, prefix = "", provider }) {
     return resolveVariant(await store.readLibrary(), variant);
   }
 
+  // Unsaved entries from the dashboard (text edited in the preview), cleaned.
+  function cleanDrafts(input) {
+    if (input === undefined || input === null) return [];
+    if (!Array.isArray(input)) throw new Error("Entries must be a list");
+    const entries = input.map(cleanEntry);
+    const ids = new Set();
+    for (const entry of entries) {
+      if (ids.has(entry.id))
+        throw new Error(`Duplicate entry id "${entry.id}"`);
+      ids.add(entry.id);
+    }
+    return entries;
+  }
+
+  // The library with those entries in place of their saved versions. Drafts
+  // only ever edit entries that exist.
+  function withDrafts(library, drafts) {
+    const entries = [...library.entries];
+    for (const draft of drafts) {
+      const index = entries.findIndex((e) => e.id === draft.id);
+      if (index === -1) throw new Error(`No entry "${draft.id}"`);
+      entries[index] = draft;
+    }
+    return { ...library, entries };
+  }
+
+  // The dashboard's preview: the variant as it would print, over the library
+  // plus any unsaved entries, with the source of every text (see publish.js).
+  async function preview(input) {
+    const variant = input && input.variant;
+    if (!variant || typeof variant !== "object") throw new Error("No variant");
+    const library = withDrafts(
+      await store.readLibrary(),
+      cleanDrafts(input.entries)
+    );
+    return resolveVariant(library, variant, { trace: true });
+  }
+
+  // Saves a variant together with the entries edited in its preview.
+  // Everything is validated before anything is written.
+  async function saveAll(input) {
+    const variant = input && input.variant;
+    if (!variant || typeof variant !== "object") throw new Error("No variant");
+    checkId(variant.id, "variant id");
+    const drafts = cleanDrafts(input.entries);
+    const [saved, variants] = await Promise.all([
+      store.readLibrary(),
+      store.listVariants(),
+    ]);
+    const library = withDrafts(saved, drafts);
+    // The other saved variants must still fit; this one is resolved as sent.
+    const others = variants.filter((v) => v.id !== variant.id);
+    for (const entry of drafts) checkEntryStillFits(entry, others);
+    checkEngagements(library);
+    resolveVariant(library, variant);
+    if (drafts.length) await store.writeLibrary(library);
+    await store.writeVariant(variant);
+    if (drafts.length) await publishSiteData(store);
+    return { ok: true, entries: drafts.length };
+  }
+
   async function saveProfile(input) {
     const profile = cleanProfile(input);
     const library = await store.readLibrary();
@@ -588,9 +649,9 @@ function createHandler({ store, authorize, prefix = "", provider }) {
           return send(200, { ok: true });
         }
         case "POST preview":
-          return send(200, {
-            pages: await validateVariant(await readBody(req)),
-          });
+          return send(200, { pages: await preview(await readBody(req)) });
+        case "POST save":
+          return send(200, await saveAll(await readBody(req)));
         case "POST publish/:id":
           return send(200, await publish(store, checkId(id)));
         case "POST timeline":
