@@ -39,7 +39,9 @@ import CvAtsDocument from "@/components/CvAtsDocument.vue";
 import CvDocument from "@/components/CvDocument.vue";
 import EntryEditor from "@/components/EntryEditor.vue";
 import LibraryList from "@/components/LibraryList.vue";
+import TailorPanel from "@/components/TailorPanel.vue";
 import VariantSectionEditor from "@/components/VariantSectionEditor.vue";
+import { measureSheets, overflowOf } from "@/cv/fit";
 import type {
   CVPage,
   EntryKind,
@@ -50,6 +52,7 @@ import type {
   Profile,
   SectionName,
   SectionOrder,
+  SheetFit,
   Variant,
   VariantRef,
   VariantSection,
@@ -61,7 +64,7 @@ interface State {
   library: { profile: Profile; entries: LibraryEntry[] };
   sections: Record<SectionName, EntryKind>;
   timelineKinds: string[];
-  variants: { id: string; name: string; layout: CvLayout }[];
+  variants: { id: string; name: string; layout: CvLayout; matcher: string }[];
   published: Record<CvLayout, string | null>;
   usage: Record<string, EntryUsage>;
 }
@@ -98,11 +101,28 @@ const busy = ref(false);
 const status = ref("");
 const error = ref("");
 
-// Which workspace is open: the Library (content) or the CVs (what each
-// prints). Remembered per browser.
+// Which workspace is open: the Library (content), the CVs (what each
+// prints) or Tailor (a CV for one job). Remembered per browser.
+type Workspace = "library" | "cvs" | "tailor";
 const WORKSPACE_KEY = "cv-admin-workspace";
-const workspace = ref<"library" | "cvs">("library");
+const WORKSPACES: { id: Workspace; label: string; hint: string }[] = [
+  { id: "library", label: "Library", hint: "the content" },
+  { id: "cvs", label: "CVs", hint: "what each one prints" },
+  { id: "tailor", label: "Tailor", hint: "a CV for a job" },
+];
+const workspace = ref<Workspace>("library");
 watch(workspace, (w) => localStorage.setItem(WORKSPACE_KEY, w));
+// The longer explanations, folded away once read. Remembered per browser.
+const HELP_KEY = "cv-admin-help";
+const helpOpen = ref<Record<Workspace, boolean>>({
+  library: true,
+  cvs: true,
+  tailor: true,
+});
+function toggleHelp(w: Workspace) {
+  helpOpen.value[w] = !helpOpen.value[w];
+  localStorage.setItem(HELP_KEY, JSON.stringify(helpOpen.value));
+}
 const showPreview = ref(false); // hidden by default; it still renders offscreen
 // "light" is the plain dashboard; "site" borrows the site's colours and type.
 const THEME_KEY = "cv-admin-theme";
@@ -669,15 +689,80 @@ function duplicate() {
     id,
     name,
     layout: variant.value?.layout ?? "styled",
+    matcher: variant.value?.matcher ?? "",
   });
   flash("Duplicated. Save to keep it.");
 }
+
+// --- Tailor: a model's CV, opened here unsaved so its sheets can be measured ---
+// Replaces whatever is open under CVs, like switching variant does.
+function confirmReplace() {
+  return !dirty.value || confirm("Discard unsaved changes to the open CV?");
+}
+
+// Opens the CV in the preview (unsaved, listed under CVs) and measures it
+// once the preview has resolved. The ATS layout isn't paged, so it returns
+// nothing to measure.
+async function tryOut(candidate: Variant): Promise<SheetFit[]> {
+  if (!state.value) return [];
+  discardDrafts();
+  paged.value = true; // the sheets are only measurable as A4 sheets
+  const settled = previewSettled();
+  variant.value = JSON.parse(JSON.stringify(candidate));
+  savedSnapshot.value = "";
+  const row = {
+    id: candidate.id,
+    name: candidate.name,
+    layout: candidate.layout ?? "styled",
+    matcher: candidate.matcher ?? "",
+  };
+  const at = state.value.variants.findIndex((v) => v.id === candidate.id);
+  if (at === -1) state.value.variants.push(row);
+  else state.value.variants[at] = row;
+  await settled;
+  await measureOverflow();
+  return (candidate.layout ?? "styled") === "styled" ? fit.value : [];
+}
+
+// A CV picked in the Tailor workspace: the generated one (already open) or
+// one on file that the model says fits.
+const openFromTailor = (id: string) =>
+  run(async () => {
+    if (variant.value?.id !== id) {
+      if (!confirmReplace()) return;
+      await loadVariant(id);
+    }
+    workspace.value = "cvs";
+    showPreview.value = true;
+  });
 
 // --- Live preview, rendered by the same code as publishing ---
 const preview = ref<CVPage[]>([]);
 const previewError = ref("");
 let previewTimer: number | undefined;
 let previewSeq = 0;
+// Callers waiting for the next preview to land (Tailor measures it then).
+let previewWaiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
+const PREVIEW_WAIT_MS = 20000;
+function previewSettled() {
+  return new Promise<void>((resolve, reject) => {
+    const waiter = { resolve, reject };
+    previewWaiters.push(waiter);
+    window.setTimeout(() => {
+      if (!previewWaiters.includes(waiter)) return;
+      previewWaiters = previewWaiters.filter((w) => w !== waiter);
+      reject(new Error("The preview took too long to render"));
+    }, PREVIEW_WAIT_MS);
+  });
+}
+function settlePreview(err?: Error) {
+  const waiting = previewWaiters;
+  previewWaiters = [];
+  for (const w of waiting) {
+    if (err) w.reject(err);
+    else w.resolve();
+  }
+}
 
 // Every change asks for a fresh preview and abandons the ones already on
 // their way, so an older answer never replaces newer text.
@@ -697,8 +782,11 @@ function schedulePreview() {
       placeNewLine(pages);
       preview.value = pages;
       previewError.value = "";
+      settlePreview();
     } catch (err) {
-      if (seq === previewSeq) previewError.value = (err as Error).message;
+      if (seq !== previewSeq) return;
+      previewError.value = (err as Error).message;
+      settlePreview(err as Error);
     }
   }, 250);
 }
@@ -992,9 +1080,11 @@ const textScope = computed(() => {
   return shared(places);
 });
 
-// In paged mode each sheet clips, so measure how much would be cut off.
+// In paged mode each sheet clips, so measure how each column is filled and
+// how much would be cut off (see cv/fit.ts).
 const previewEl = ref<HTMLElement | null>(null);
-const overflow = ref<{ page: number; mm: number }[]>([]);
+const fit = ref<SheetFit[]>([]);
+const overflow = computed(() => overflowOf(fit.value));
 
 async function measureOverflow() {
   await nextTick();
@@ -1003,18 +1093,10 @@ async function measureOverflow() {
     ".cv-sheets .cv-page"
   );
   if (!(paged.value || !showPreview.value) || !sheets?.length) {
-    overflow.value = [];
+    fit.value = [];
     return;
   }
-  const A4_MM = 297;
-  overflow.value = [...sheets]
-    .map((el, i) => ({
-      page: i + 1,
-      mm: Math.round(
-        ((el.scrollHeight - el.clientHeight) / el.clientHeight) * A4_MM
-      ),
-    }))
-    .filter((o) => o.mm > 0);
+  fit.value = measureSheets(sheets);
 }
 
 watch([preview, paged, zoom, showPreview], measureOverflow);
@@ -1045,7 +1127,16 @@ onMounted(() => {
   window.addEventListener("beforeunload", warnOnUnload);
   theme.value = localStorage.getItem(THEME_KEY) === "site" ? "site" : "light";
   editText.value = localStorage.getItem(EDIT_KEY) !== "off";
-  if (localStorage.getItem(WORKSPACE_KEY) === "cvs") workspace.value = "cvs";
+  const saved = localStorage.getItem(WORKSPACE_KEY) as Workspace | null;
+  if (saved && WORKSPACES.some((w) => w.id === saved)) workspace.value = saved;
+  try {
+    const help = JSON.parse(localStorage.getItem(HELP_KEY) ?? "{}");
+    for (const w of WORKSPACES) {
+      if (typeof help[w.id] === "boolean") helpOpen.value[w.id] = help[w.id];
+    }
+  } catch {
+    // keep the defaults
+  }
 });
 
 // Load once signed in; forget everything on sign-out.
@@ -1109,27 +1200,45 @@ onBeforeRouteLeave(
     <div v-if="error" class="alert alert-danger no-print">{{ error }}</div>
 
     <template v-if="state">
-      <!-- Two workspaces: the Library holds the content; CVs decide what each
-           one prints. Nothing under Library is specific to a CV. -->
+      <!-- Three workspaces: the Library holds the content; CVs decide what
+           each one prints; Tailor builds a CV for one job. Nothing under
+           Library is specific to a CV. -->
       <div class="cv-admin__tabs cv-admin__switch no-print">
-        <button
-          :class="{ active: workspace === 'library' }"
-          @click="workspace = 'library'"
+        <span
+          class="cv-admin__brand"
+          title="The CV desk: the content behind the site and the CVs"
         >
-          Library
-          <span class="cv-admin__count">{{ entries.length }}</span>
-        </button>
+          Desk
+        </span>
         <button
-          :class="{ active: workspace === 'cvs' }"
-          @click="workspace = 'cvs'"
+          v-for="w in WORKSPACES"
+          :key="w.id"
+          :class="{ active: workspace === w.id }"
+          :title="`${w.label}: ${w.hint}`"
+          @click="workspace = w.id"
         >
-          CVs
-          <span class="cv-admin__count">{{ state.variants.length }}</span>
-          <span v-if="dirty" class="cv-admin__badge">unsaved</span>
+          <span class="cv-admin__tab-label">
+            {{ w.label }}
+            <span v-if="w.id === 'library'" class="cv-admin__count">{{
+              entries.length
+            }}</span>
+            <span v-else-if="w.id === 'cvs'" class="cv-admin__count">{{
+              state.variants.length
+            }}</span>
+            <span v-if="w.id === 'cvs' && dirty" class="cv-admin__badge"
+              >unsaved</span
+            >
+          </span>
+          <span class="cv-admin__tab-hint">{{ w.hint }}</span>
         </button>
         <span
           class="small ms-auto text-truncate"
           :class="dirty ? 'text-warning' : 'text-success'"
+          :title="
+            dirty
+              ? 'The open CV (or text edited in its preview) is not saved yet'
+              : ''
+          "
         >
           {{ dirty ? "Unsaved CV changes" : status }}
         </span>
@@ -1140,9 +1249,18 @@ onBeforeRouteLeave(
         >
           {{ theme === "site" ? "Light theme" : "Site theme" }}
         </button>
-        <span class="small text-muted text-nowrap">
+        <span
+          class="small text-muted text-nowrap"
+          :title="`Signed in as ${email}`"
+        >
           {{ email }}
-          <button class="a-btn ms-1" @click="signOut">Sign out</button>
+          <button
+            class="a-btn ms-1"
+            title="Sign out of the dashboard"
+            @click="signOut"
+          >
+            Sign out
+          </button>
         </span>
       </div>
 
@@ -1152,11 +1270,27 @@ onBeforeRouteLeave(
         class="cv-admin__panel cv-admin__panel--library no-print"
       >
         <div class="d-flex gap-2 align-items-center flex-wrap mb-3">
-          <p class="small text-muted mb-0 flex-grow-1">
-            Everything the site and the CVs draw from. Click an entry to edit
-            it, including its condensed bullets per CV. What each CV prints is
-            chosen under CVs.
-          </p>
+          <div class="flex-grow-1">
+            <h2 class="cv-admin__title">
+              Library
+              <button
+                class="cv-admin__help-btn"
+                :title="
+                  helpOpen.library ? 'Hide the explanation' : 'What is this?'
+                "
+                :aria-expanded="helpOpen.library"
+                @click="toggleHelp('library')"
+              >
+                ?
+              </button>
+            </h2>
+            <p v-if="helpOpen.library" class="small text-muted mb-0">
+              Everything the site and the CVs draw from. Click an entry to edit
+              it, including its condensed bullets per CV. What each CV prints is
+              chosen under CVs; saving an entry republishes the timeline and
+              project cards straight away.
+            </p>
+          </div>
           <button
             class="a-btn"
             title="Name and contact details, shared by every CV"
@@ -1199,9 +1333,51 @@ onBeforeRouteLeave(
         />
       </section>
 
-      <!-- CVs workspace: kept mounted (v-show) so the preview keeps measuring
-           overflow and printing works. -->
-      <div v-show="workspace === 'cvs'" class="cv-admin__grid">
+      <!-- Tailor workspace: a model picks a CV for one job from the Library.
+           Kept mounted so a run in progress survives a look at the preview. -->
+      <section
+        v-show="workspace === 'tailor'"
+        class="cv-admin__panel cv-admin__panel--library no-print"
+      >
+        <h2 class="cv-admin__title">
+          Tailor a CV to a job
+          <button
+            class="cv-admin__help-btn"
+            :title="
+              helpOpen.tailor ? 'Hide the explanation' : 'How does this work?'
+            "
+            :aria-expanded="helpOpen.tailor"
+            @click="toggleHelp('tailor')"
+          >
+            ?
+          </button>
+        </h2>
+        <p v-if="helpOpen.tailor" class="small text-muted">
+          Paste a job description and a model picks what to print from the
+          Library: which jobs, which bullets (or condensed highlights), which
+          clients to show or roll up, and where the page breaks go. It never
+          writes bullets of its own; it writes the headline, the summary and a
+          one-line "fits" note so a similar job can reuse the CV later. The
+          result opens under CVs unsaved, its sheets are measured, and anything
+          that would be cut off goes back to the model to fix. If a CV on file
+          already fits the job, it says so instead.
+        </p>
+        <TailorPanel
+          :variants="state.variants"
+          :busy="busy"
+          :try-out="tryOut"
+          :confirm-replace="confirmReplace"
+          @open="openFromTailor"
+        />
+      </section>
+
+      <!-- CVs workspace: kept laid out offstage (not display: none) so the
+           preview keeps measuring overflow, Tailor can measure the CV it
+           opens, and printing works. -->
+      <div
+        class="cv-admin__grid"
+        :class="{ 'is-offstage': workspace !== 'cvs' }"
+      >
         <section class="cv-admin__panel no-print">
           <div v-if="!variant" class="cv-admin__gate">
             <h1 class="cv-admin__gate-title">No CVs yet</h1>
@@ -1212,7 +1388,10 @@ onBeforeRouteLeave(
             <!-- Variant settings -->
             <div class="cv-admin__variant">
               <div class="d-flex gap-2 align-items-end flex-wrap">
-                <label class="flex-grow-1">
+                <label
+                  class="flex-grow-1"
+                  title="Which CV to work on. Each one picks its own entries and bullets from the Library."
+                >
                   <span class="cv-admin__label">CV</span>
                   <select
                     class="form-select form-select-sm"
@@ -1231,26 +1410,40 @@ onBeforeRouteLeave(
                     </option>
                   </select>
                 </label>
-                <button class="a-btn" :disabled="busy" @click="duplicate">
+                <button
+                  class="a-btn"
+                  title="Start a new CV as a copy of this one (unsaved until you Save)"
+                  :disabled="busy"
+                  @click="duplicate"
+                >
                   Duplicate
                 </button>
               </div>
               <div class="row g-2 mt-1">
-                <label class="col-6">
+                <label
+                  class="col-6"
+                  title="How this CV is listed here; never printed"
+                >
                   <span class="cv-admin__label">Variant name</span>
                   <input
                     v-model="variant.name"
                     class="form-control form-control-sm"
                   />
                 </label>
-                <label class="col-6">
+                <label
+                  class="col-6"
+                  title="Printed under the name, e.g. the role being applied for"
+                >
                   <span class="cv-admin__label">CV headline</span>
                   <input
                     v-model="variant.title"
                     class="form-control form-control-sm"
                   />
                 </label>
-                <label class="col-12">
+                <label
+                  class="col-12"
+                  title="The opening paragraph of this CV. Inline tags like <strong> are kept."
+                >
                   <span class="cv-admin__label">Summary (HTML allowed)</span>
                   <textarea
                     v-model="variant.summary"
@@ -1258,7 +1451,31 @@ onBeforeRouteLeave(
                     class="form-control form-control-sm"
                   ></textarea>
                 </label>
-                <label class="col-6">
+                <label
+                  class="col-12"
+                  title="One line on the kind of role this CV suits. Tailor reads it to suggest this CV for a similar job instead of making a new one."
+                >
+                  <span class="cv-admin__label">Fits (for Tailor)</span>
+                  <input
+                    :value="variant.matcher ?? ''"
+                    class="form-control form-control-sm"
+                    placeholder="e.g. Senior frontend roles with a Vue or React focus"
+                    maxlength="160"
+                    @input="
+                      variant.matcher =
+                        ($event.target as HTMLInputElement).value || undefined
+                    "
+                    @change="
+                      variant.matcher =
+                        ($event.target as HTMLInputElement).value.trim() ||
+                        undefined
+                    "
+                  />
+                </label>
+                <label
+                  class="col-6"
+                  title="Styled: the two-column design shown on the site. ATS: a plain single column that applicant tracking systems can parse."
+                >
                   <span class="cv-admin__label">Layout</span>
                   <select
                     class="form-select form-select-sm"
@@ -1292,7 +1509,7 @@ onBeforeRouteLeave(
                   :title="
                     drafts.size
                       ? 'Saves this CV and the Library text edited in its preview'
-                      : ''
+                      : 'Saves this CV. Nothing changes on the site until it is published.'
                   "
                   @click="save"
                 >
@@ -1301,6 +1518,7 @@ onBeforeRouteLeave(
                 <button
                   class="a-btn a-btn--success"
                   :disabled="busy"
+                  title="Saves, then makes this the CV the site shows for its layout (styled on /cv, ATS when printing)"
                   @click="saveAndPublish"
                 >
                   Save &amp; publish
@@ -1308,12 +1526,18 @@ onBeforeRouteLeave(
                 <button
                   class="a-btn"
                   :disabled="busy || !dirty || !savedSnapshot"
+                  title="Throw away the unsaved changes to this CV and to the text edited in its preview"
                   @click="revert"
                 >
                   Revert
                 </button>
                 <button
                   class="a-btn ms-auto"
+                  :title="
+                    showPreview
+                      ? 'Hide the preview (it still measures overflow behind the scenes)'
+                      : 'Show the CV as it prints, next to the layout'
+                  "
                   @click="showPreview = !showPreview"
                 >
                   {{ showPreview ? "Hide preview" : "Show preview" }}
@@ -1346,23 +1570,48 @@ onBeforeRouteLeave(
 
             <!-- Layout: one ordered list of sections, cut into sheets by breaks -->
             <div>
-              <p class="small text-muted">
-                <strong
-                  >Layout · {{ placement.size }} entries on this CV.</strong
+              <h2 class="cv-admin__title">
+                Layout
+                <span class="cv-admin__count" title="Entries on this CV">{{
+                  placement.size
+                }}</span>
+                <button
+                  class="cv-admin__help-btn"
+                  :title="
+                    helpOpen.cvs
+                      ? 'Hide the explanation'
+                      : 'How does the layout work?'
+                  "
+                  :aria-expanded="helpOpen.cvs"
+                  @click="toggleHelp('cvs')"
                 >
-                Tick what it prints: entries, their bullets, and a job's client
-                engagements (untick a client and tick its bullets to print them
-                under the job instead). Full / Condensed on a row switches
-                between all of its bullets and the condensed ones written for
-                this CV in the Library. Dimmed rows aren't on this CV yet. Most
-                important first; page breaks cut the list into printed sheets,
-                and a section that continues repeats its heading.
+                  ?
+                </button>
+              </h2>
+              <p v-if="helpOpen.cvs" class="small text-muted">
+                Tick what this CV prints: entries, their bullets, and a job's
+                client engagements (untick a client and tick its bullets to
+                print them under the job instead). Full / Condensed on a row
+                switches between all of its bullets and the condensed ones
+                written for this CV in the Library. Dimmed rows aren't on this
+                CV yet. Most important first; page breaks (⤓) cut the list into
+                printed sheets, and a section that continues repeats its
+                heading. The preview measures each sheet and warns above when
+                something would be cut off.
               </p>
               <div class="d-flex gap-2 mb-2 small">
-                <button class="cv-admin__link" @click="collapseAll(true)">
+                <button
+                  class="cv-admin__link"
+                  title="Fold every section down to its heading"
+                  @click="collapseAll(true)"
+                >
                   Collapse all
                 </button>
-                <button class="cv-admin__link" @click="collapseAll(false)">
+                <button
+                  class="cv-admin__link"
+                  title="Open every section"
+                  @click="collapseAll(false)"
+                >
                   Expand all
                 </button>
               </div>
@@ -1513,16 +1762,24 @@ onBeforeRouteLeave(
               <select
                 v-model.number="zoom"
                 class="form-select form-select-sm w-auto"
+                title="Zoom of the preview on screen; print is always full size"
               >
                 <option :value="0.5">50%</option>
                 <option :value="0.6">60%</option>
                 <option :value="0.75">75%</option>
                 <option :value="1">100%</option>
               </select>
-              <button class="a-btn" @click="printCv">Print / save PDF</button>
+              <button
+                class="a-btn"
+                title="Open the print dialog for this CV as it is now (choose Save as PDF there)"
+                @click="printCv"
+              >
+                Print / save PDF
+              </button>
               <label
                 v-if="(variant.layout ?? 'styled') === 'styled'"
                 class="form-check small mb-0 ms-1"
+                title="Show the CV as separate A4 sheets, as it prints, so overflow is visible; off shows it as one continuous page, as on the site"
               >
                 <input
                   v-model="paged"
@@ -1818,8 +2075,10 @@ onBeforeRouteLeave(
   align-items: start;
 }
 
-// Hidden preview: kept in the layout flow of nothing, offscreen but laid out
-// at full size so overflow can still be measured.
+// Hidden preview, and the whole CVs workspace while another tab is open:
+// kept in the layout flow of nothing, offscreen but laid out at full size
+// so overflow can still be measured.
+.cv-admin__grid.is-offstage,
 .cv-admin__preview.is-hidden {
   position: fixed;
   top: 0;
@@ -1947,6 +2206,72 @@ onBeforeRouteLeave(
     font-weight: 600;
     padding: 0.5rem 1rem;
     margin-bottom: -1px;
+  }
+}
+
+.cv-admin__brand {
+  font-family: var(--ad-label-font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ad-faint);
+  padding: 0 0.75rem 0 0.25rem;
+}
+
+.cv-admin__tab-label {
+  display: block;
+}
+
+// A word under each tab on what the workspace is for.
+.cv-admin__tab-hint {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ad-faint);
+  line-height: 1.1;
+}
+
+.cv-admin__switch > button.active .cv-admin__tab-hint {
+  color: var(--ad-muted);
+}
+
+.cv-admin__switch > button:hover {
+  color: var(--ad-text);
+  background: var(--ad-bg-2);
+  border-radius: 0.375rem 0.375rem 0 0;
+}
+
+// A workspace or panel heading, with the "?" that folds its explanation.
+.cv-admin__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--ad-label-font);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  color: var(--ad-text);
+}
+
+.cv-admin__help-btn {
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--ad-line-strong);
+  border-radius: 999px;
+  background: var(--ad-bg);
+  color: var(--ad-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+
+  &:hover,
+  &[aria-expanded="true"] {
+    border-color: var(--ad-accent);
+    color: var(--ad-accent);
   }
 }
 
@@ -2092,6 +2417,25 @@ onBeforeRouteLeave(
   }
 }
 
+// Every button in the dashboard answers to the pointer: a border that
+// picks up the accent, and a little lift. Scoped rules in the components
+// set the colours; these only add the hover and focus states.
+:deep(.a-btn:not(:disabled):hover) {
+  border-color: var(--ad-accent);
+  box-shadow: 0 1px 3px var(--ad-shadow);
+  cursor: pointer;
+}
+
+:deep(.a-btn:not(:disabled):active) {
+  transform: translateY(1px);
+}
+
+:deep(.a-btn:focus-visible),
+:deep(.cv-admin__link:focus-visible) {
+  outline: 2px solid var(--ad-accent);
+  outline-offset: 2px;
+}
+
 @media (max-width: 992px) {
   .cv-admin__grid {
     grid-template-columns: 1fr;
@@ -2108,8 +2452,12 @@ onBeforeRouteLeave(
 }
 
 @media print {
-  .cv-admin__grid {
+  .cv-admin__grid,
+  .cv-admin__grid.is-offstage {
     display: block;
+    position: static;
+    transform: none;
+    visibility: visible;
   }
 
   .cv-admin__preview,

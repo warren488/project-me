@@ -298,7 +298,19 @@ export interface Variant {
   summary?: string;
   layout?: CvLayout; // default "styled"
   contact?: boolean; // include phone and location (for PDFs, not the site)
+  // One line on the kind of role this CV fits. Tailor reads it to suggest
+  // this CV for a similar job instead of making a new one.
+  matcher?: string;
   sections: VariantItem[];
+}
+
+// How well a resolved CV fits its A4 sheets, measured in the dashboard's
+// preview: per sheet, the free space at the bottom of each column in mm
+// (negative = cut off in print). Only the styled layout is measured.
+export interface SheetFit {
+  page: number;
+  sidebar?: { free: number };
+  main?: { free: number };
 }
 
 // Which saved variants reference an entry, and each of its bullets. Built by

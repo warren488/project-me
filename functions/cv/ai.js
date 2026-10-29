@@ -1,5 +1,6 @@
-// The model behind "Condense" on the server. One small interface,
-// complete({ system, user }) -> text, with two implementations: Anthropic,
+// The model behind "Condense" and "Tailor" on the server. One small
+// interface, complete({ system, user, maxTokens, effort }) -> text, with two
+// implementations: Anthropic,
 // and any OpenAI-compatible chat endpoint (OpenAI, OpenRouter, Ollama,
 // LM Studio). A deployed function can only reach hosted providers; the
 // emulator can point "openai" at a model on this machine.
@@ -30,17 +31,19 @@ function createProvider({ provider, model, baseUrl, apiKey } = {}) {
   return { name, model: chosen, complete: openaiCompatible(chosen, root, key) };
 }
 
+const DEFAULT_MAX_TOKENS = 2048;
+
 function anthropic(model, apiKey) {
-  return async ({ system, user }) => {
+  return async ({ system, user, maxTokens, effort }) => {
     // Loaded on demand so the other provider and the tests never pay for it.
     const Anthropic = require("@anthropic-ai/sdk");
     const client = new Anthropic({ apiKey });
     const response = await client.beta.messages.create({
       model,
-      max_tokens: 2048,
+      max_tokens: maxTokens || DEFAULT_MAX_TOKENS,
       system,
       messages: [{ role: "user", content: user }],
-      output_config: { effort: "low" },
+      output_config: { effort: effort || "low" },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
     });
@@ -48,6 +51,8 @@ function anthropic(model, apiKey) {
       const why = response.stop_details && response.stop_details.explanation;
       throw new Error(`The model declined${why ? `: ${why}` : ""}`);
     }
+    if (response.stop_reason === "max_tokens")
+      throw new Error("The model's reply was cut short (max_tokens)");
     return response.content
       .filter((block) => block.type === "text")
       .map((block) => block.text)
@@ -56,7 +61,7 @@ function anthropic(model, apiKey) {
 }
 
 function openaiCompatible(model, baseUrl, apiKey) {
-  return async ({ system, user }) => {
+  return async ({ system, user, maxTokens }) => {
     const headers = { "Content-Type": "application/json" };
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -65,6 +70,7 @@ function openaiCompatible(model, baseUrl, apiKey) {
       body: JSON.stringify({
         model,
         temperature: 0.4,
+        max_tokens: maxTokens || DEFAULT_MAX_TOKENS,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },

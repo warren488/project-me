@@ -515,7 +515,10 @@ function remove() {
     </div>
 
     <div class="row g-2">
-      <label class="col-4">
+      <label
+        class="col-4"
+        title="What kind of entry this is. It decides which CV section it can print in."
+      >
         <span class="entry-editor__label">Type</span>
         <select v-model="form.kind" class="form-select form-select-sm">
           <option v-for="k in KINDS" :key="k" :value="k">
@@ -535,7 +538,10 @@ function remove() {
           @input="customId = true"
         />
       </label>
-      <label class="col-12">
+      <label
+        class="col-12"
+        title="Printed as the heading: the role, the client, the degree, the project…"
+      >
         <span class="entry-editor__label">Title</span>
         <input
           v-model="form.title"
@@ -729,7 +735,10 @@ function remove() {
           />
         </label>
       </template>
-      <label class="col-12">
+      <label
+        class="col-12"
+        title="Free-form labels for grouping and searching; never printed"
+      >
         <span class="entry-editor__label">Tags (comma separated)</span>
         <input
           v-model="form.tags"
@@ -761,7 +770,12 @@ function remove() {
         <span class="entry-editor__label mb-0 flex-grow-1"
           >{{ fields.bullets }} (HTML allowed)</span
         >
-        <button type="button" class="a-btn a-btn--icon" @click="addBullet">
+        <button
+          type="button"
+          class="a-btn a-btn--icon"
+          title="Add a bullet point to this entry"
+          @click="addBullet"
+        >
           + Add bullet
         </button>
       </div>
@@ -781,7 +795,11 @@ function remove() {
           <input
             v-model="bullet.id"
             class="form-control form-control-sm font-monospace w-auto flex-grow-1"
-            title="Bullet id"
+            :title="
+              bulletUsedIn(bullet.id).length
+                ? 'Bullet id (fixed: a CV refers to it)'
+                : 'Bullet id, made from the text until you edit it'
+            "
             :readonly="bulletUsedIn(bullet.id).length > 0"
             @input="bullet.customId = true"
           />
@@ -790,6 +808,7 @@ function remove() {
             class="form-control form-control-sm w-auto flex-grow-1"
             placeholder="tags"
             list="entry-editor-tags"
+            title="Tags for this bullet (comma separated)"
           />
           <button
             type="button"
@@ -896,14 +915,18 @@ function remove() {
             <input
               v-model="highlight.id"
               class="form-control form-control-sm font-monospace w-auto flex-grow-1"
-              title="Highlight id"
+              :title="
+                bulletUsedIn(highlight.id).length
+                  ? 'Highlight id (fixed: a CV refers to it)'
+                  : 'Highlight id, made from the text until you edit it'
+              "
               :readonly="bulletUsedIn(highlight.id).length > 0"
               @input="highlight.customId = true"
             />
             <span
               v-if="highlight.from.length"
               class="chip chip--sm"
-              :title="sourceText(highlight.from)"
+              :title="`Condensed from:\n${sourceText(highlight.from)}`"
             >
               from {{ highlight.from.length }}
             </span>
@@ -973,13 +996,19 @@ function remove() {
     </div>
 
     <div class="d-flex gap-2 mt-3">
-      <button type="submit" class="a-btn a-btn--primary" :disabled="busy">
+      <button
+        type="submit"
+        class="a-btn a-btn--primary"
+        :disabled="busy"
+        title="Save to the Library. The timeline and project cards on the site update straight away; CVs print the new text once published."
+      >
         {{ isNew ? "Add to library" : "Save entry" }}
       </button>
       <button
         type="button"
         class="a-btn"
         :disabled="busy"
+        title="Close without saving"
         @click="emit('cancel')"
       >
         Cancel
@@ -989,6 +1018,7 @@ function remove() {
         type="button"
         class="a-btn a-btn--danger ms-auto"
         :disabled="busy"
+        title="Delete this entry from the Library (refused while a CV still uses it)"
         @click="remove"
       >
         Delete

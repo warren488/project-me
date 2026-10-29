@@ -54,8 +54,8 @@ NUXT_PUBLIC_AUTH_EMULATOR=http://127.0.0.1:9099 npm run dev
 
 ### Condensing bullets
 
-The dashboard has two workspaces: **Library** (the content) and **CVs**
-(what each CV prints). In the Library, a job or client engagement's editor
+The dashboard has three workspaces: **Library** (the content), **CVs**
+(what each CV prints) and **Tailor** (a CV for one job, see below). In the Library, a job or client engagement's editor
 has a Condensed section with one group per CV: "✦ Condense…" turns the
 saved bullets into a few highlights written for that CV with a model's help
 (the CV's headline and summary are the audience), and each CV can hold its
@@ -85,6 +85,27 @@ With the emulators, the server mode can use a local model too: put
 `AI_MODEL=<name>` in `functions/.env.local` and any value for `AI_API_KEY` in
 `functions/.secret.local` (both ignored by git). `npm --prefix functions test`
 covers the prompt, the reply parser and the API route.
+
+### Tailoring a CV to a job
+
+The third workspace, **Tailor**, takes a job description (and optional
+notes) and has a model pick what a CV prints for it from the Library:
+which jobs, which bullets or condensed highlights, which client engagements
+to show or roll up, where the page breaks go, plus a headline, a summary
+and a one-line **Fits** note (the variant's `matcher`). It never writes
+bullets of its own: the reply is a list of ids, which the function repairs
+against the library (unknown ids dropped and reported) and resolves before
+it reaches the dashboard. The result opens under CVs as an unsaved CV; the
+preview measures each A4 sheet column by column (`app/cv/fit.ts`) and, when
+something would be cut off, sends the measurements back to the model for a
+correction pass (up to two, then "Fix the fit again" by hand). If a CV on
+file already suits the job, judged by its Fits note, the model says so and
+offers to open it instead. The same three ways of running it apply as for
+Condense (server, local model, copy prompt); in copy mode the fix-up prompt
+carries the measurements. `functions/cv/tailor.js` holds the prompt, the
+reply parser and the repair; `POST tailor` is the route (`job`, `notes`,
+`base`, `run`, or `previous` + `fit` for a correction, or `reply` to read a
+reply obtained elsewhere).
 
 ### Editing in the preview
 
