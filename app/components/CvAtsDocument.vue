@@ -22,7 +22,9 @@ const props = defineProps({
   pages: { type: Array as PropType<CVPage[]>, required: true },
 });
 
-usePrintPage("size: A4; margin: 18mm 20mm;");
+// The margins live on the document rather than the page (see the print
+// styles), so the print dialog's Margins setting can't take them away.
+usePrintPage("size: A4; margin: 0;");
 
 const page = computed(() => mergePages(props.pages));
 const profile = computed(() => page.value?.profile);
@@ -43,7 +45,7 @@ const contactLine = computed(() =>
 
 <template>
   <div v-if="page && profile" class="ats">
-    <header class="ats__header">
+    <div class="ats__header">
       <CvText tag="h1" :value="profile.name" :src="PROFILE" />
       <CvText
         tag="p"
@@ -57,7 +59,7 @@ const contactLine = computed(() =>
         :value="contactLine"
         :src="PROFILE"
       />
-    </header>
+    </div>
 
     <section v-if="profile.summary">
       <h2>Summary</h2>
@@ -360,7 +362,9 @@ const contactLine = computed(() =>
     max-width: none;
     min-height: 0;
     margin: 0;
-    padding: 0;
+    /* Repeated on every sheet, so each one keeps its margins. */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
     box-shadow: none;
     z-index: 9999;
   }
