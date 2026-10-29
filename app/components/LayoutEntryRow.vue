@@ -284,6 +284,7 @@ const engMeta = (eng: LibraryEntry) => {
           type="checkbox"
           class="form-check-input ler__check"
           :checked="ownIds.includes(b.id)"
+          title="Print this bullet on this CV"
           @change="toggleOwn(b.id, checked($event))"
         />
         <span class="ler__label" :title="plain(b.text)">{{

@@ -64,18 +64,27 @@ const toggleEntry = (id: string, on: boolean) =>
       >
         {{ collapsed ? "▸" : "▾" }}
       </button>
-      <span class="vse__label flex-grow-1" @click="emit('toggle')">
+      <span
+        class="vse__label flex-grow-1"
+        :title="`${label}: ${count(item)} of ${count(item) + available.length} entries on this CV. Click to fold.`"
+        @click="emit('toggle')"
+      >
         {{ label }}
-        <span class="vse__tag"
+        <span class="vse__tag" title="Entries on this CV / in the Library"
           >{{ count(item) }}/{{ count(item) + available.length }}</span
         >
-        <span v-if="sheet" class="vse__tag">p{{ sheet }}</span>
+        <span
+          v-if="sheet"
+          class="vse__tag"
+          title="Printed sheet this section starts on"
+          >p{{ sheet }}</span
+        >
         <span v-if="absent" class="vse__tag is-muted">not on this CV</span>
       </span>
       <template v-if="!absent">
         <select
           class="form-select form-select-sm w-auto py-0"
-          title="Order of the entries in this section"
+          title="Order of the entries in this section: as listed, or newest first by start date"
           :value="item.order ?? 'manual'"
           @change="emit('order', orderValue($event))"
         >

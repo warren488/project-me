@@ -24,6 +24,12 @@ const {
   PROJECT_HOMES,
 } = require("./publish");
 const { buildPrompt, parseProposals } = require("./condense");
+const {
+  buildTailorPrompt,
+  parseTailorReply,
+  repairVariant,
+  variantIdFor,
+} = require("./tailor");
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2]))?$/;
@@ -362,10 +368,11 @@ function createHandler({ store, authorize, prefix = "", provider }) {
       sections: SECTION_KINDS,
       sidebarSections: SIDEBAR_SECTIONS,
       timelineKinds: TIMELINE_DEFAULT_KINDS,
-      variants: variants.map(({ id, name, layout }) => ({
+      variants: variants.map(({ id, name, layout, matcher }) => ({
         id,
         name,
         layout: layout || "styled",
+        matcher: matcher || "",
       })),
       // Which variant fills each layout slot on the site.
       published: {
@@ -562,6 +569,92 @@ function createHandler({ store, authorize, prefix = "", provider }) {
     }
   }
 
+  // "Tailor": the prompt that picks what a CV prints for one job description
+  // and, when asked and a provider is configured, the model's CV, repaired
+  // against the library. With `reply`, a reply obtained elsewhere (a local
+  // model, a chat tool) is read and repaired the same way, so the dashboard
+  // never parses one itself. `previous` and `fit` ask for a corrected
+  // version of an earlier reply once the dashboard has measured its sheets.
+  async function tailor(input) {
+    if (!input || typeof input !== "object") throw new Error("No request");
+    const [library, variants, site] = await Promise.all([
+      store.readLibrary(),
+      store.listVariants(),
+      readPublished(store),
+    ]);
+    for (const entry of library.entries) entry.displayDates = formatRange(entry);
+    const previous =
+      input.previous && typeof input.previous === "object" ? input.previous : null;
+    const taken = variants.map((v) => v.id);
+    const settle = (text) => {
+      const reply = parseTailorReply(text);
+      const id =
+        previous && typeof previous.id === "string" && previous.id
+          ? previous.id
+          : variantIdFor(reply.cv.name, taken);
+      const { variant, dropped } = repairVariant(library, reply.cv, { id });
+      // A suggestion must name a CV that exists.
+      const suggest =
+        reply.suggest && variants.some((v) => v.id === reply.suggest.id)
+          ? reply.suggest
+          : null;
+      return { variant, suggest, why: reply.why, dropped };
+    };
+    // A reply from a local model or a chat tool: just read it.
+    if (typeof input.reply === "string" && input.reply.trim()) {
+      return { status: 200, body: { result: settle(input.reply) } };
+    }
+    const baseId = optionalString(input, "base");
+    const base = baseId
+      ? variants.find((v) => v.id === checkId(baseId, "variant id"))
+      : undefined;
+    if (baseId && !base) throw new Error(`No variant "${baseId}"`);
+    const prompt = buildTailorPrompt({
+      library,
+      variants,
+      published: {
+        styled: site.styled ? site.styled.variant : null,
+        ats: site.ats ? site.ats.variant : null,
+      },
+      job: input.job,
+      notes: input.notes,
+      base,
+      previous,
+      fit: Array.isArray(input.fit) ? input.fit : undefined,
+    });
+    const out = { prompt };
+    if (!input.run) return { status: 200, body: out };
+    const ai = provider ? provider() : null;
+    if (!ai) {
+      return {
+        status: 501,
+        body: {
+          ...out,
+          error:
+            "No AI provider is configured on the server. Use a local model or copy the prompt instead.",
+        },
+      };
+    }
+    try {
+      const text = await ai.complete({
+        ...prompt,
+        maxTokens: 8192,
+        // A correction pass is a smaller job than the first draft.
+        effort: previous ? "low" : "medium",
+      });
+      return {
+        status: 200,
+        body: {
+          ...out,
+          result: settle(text),
+          provider: { name: ai.name, model: ai.model },
+        },
+      };
+    } catch (err) {
+      return { status: 502, body: { ...out, error: err.message } };
+    }
+  }
+
   // A bundle is a backup of everything editable: the library, the variants,
   // and (informationally) the site output. Import replaces the lot, then
   // regenerates the site output from the imported data.
@@ -665,6 +758,10 @@ function createHandler({ store, authorize, prefix = "", provider }) {
           return send(200, { ok: true });
         case "POST condense/:id": {
           const result = await condense(id, await readBody(req));
+          return send(result.status, result.body);
+        }
+        case "POST tailor": {
+          const result = await tailor(await readBody(req));
           return send(result.status, result.body);
         }
         case "GET export":

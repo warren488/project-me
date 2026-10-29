@@ -143,7 +143,11 @@ function surfaceChips(e: LibraryEntry) {
 <template>
   <div class="lib">
     <div class="d-flex gap-2 mb-2 flex-wrap align-items-center">
-      <select v-model="groupBy" class="form-select form-select-sm w-auto">
+      <select
+        v-model="groupBy"
+        class="form-select form-select-sm w-auto"
+        title="How the entries are grouped below"
+      >
         <option value="kind">Group by type</option>
         <option value="org">Group by company / org</option>
         <option value="year">Group by start year</option>
@@ -154,10 +158,12 @@ function surfaceChips(e: LibraryEntry) {
         type="search"
         class="form-control form-control-sm w-auto flex-grow-1"
         placeholder="Search (includes notes)"
+        title="Matches titles, bullets, tags, tech and private notes"
       />
       <button
         class="a-btn a-btn--primary"
         :disabled="busy"
+        title="Add a job, client engagement, education, project, skill, competency, achievement or interest"
         @click="emit('create')"
       >
         + New entry
@@ -183,6 +189,7 @@ function surfaceChips(e: LibraryEntry) {
             { 'is-wide': WIDE_KINDS.includes(entry.kind) },
           ]"
           :disabled="busy"
+          :title="`Edit ${entry.title}`"
           @click="emit('edit', entry)"
         >
           <span class="lib__body">

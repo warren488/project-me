@@ -230,7 +230,10 @@ onMounted(load);
     </p>
 
     <div class="row g-2 align-items-end">
-      <label class="col-4">
+      <label
+        class="col-4"
+        title="The CV these highlights are written for: its headline and summary set the audience. General ones serve any CV without its own."
+      >
         <span class="condense__label">For</span>
         <select v-model="forId" class="form-select form-select-sm">
           <option v-for="v in variants" :key="v.id" :value="v.id">
@@ -239,7 +242,7 @@ onMounted(load);
           <option value="">General (any CV)</option>
         </select>
       </label>
-      <label class="col-2">
+      <label class="col-2" title="How many highlights to write (2 to 6)">
         <span class="condense__label">Bullets</span>
         <input
           v-model.number="settings.count"
@@ -249,7 +252,10 @@ onMounted(load);
           class="form-control form-control-sm"
         />
       </label>
-      <label class="col-3">
+      <label
+        class="col-3"
+        title="Where the model runs: the server's provider, a model on this machine, or a chat tool by hand"
+      >
         <span class="condense__label">Run it with</span>
         <select v-model="settings.mode" class="form-select form-select-sm">
           <option v-for="m in MODES" :key="m.value" :value="m.value">
@@ -262,6 +268,7 @@ onMounted(load);
           type="button"
           class="a-btn w-100"
           :disabled="loading"
+          title="Build the prompt from the saved bullets and run it"
           @click="load"
         >
           {{ drafts.length ? "Run again" : "Run" }}
@@ -294,6 +301,7 @@ onMounted(load);
             type="button"
             class="a-btn"
             :disabled="!response"
+            title="Copy the whole prompt to the clipboard"
             @click="copyPrompt"
           >
             {{ copied ? "Copied" : "Copy prompt" }}
@@ -302,6 +310,7 @@ onMounted(load);
             type="button"
             class="a-btn a-btn--icon"
             :disabled="!response"
+            title="Show the prompt here instead, to select and copy by hand"
             @click="showPrompt = !showPrompt"
           >
             {{ showPrompt ? "Hide prompt" : "Show prompt" }}
@@ -329,6 +338,7 @@ onMounted(load);
             type="button"
             class="a-btn"
             :disabled="!reply.trim() || !response"
+            title="Read the pasted reply into proposals below"
             @click="parseReply"
           >
             Read reply
@@ -356,6 +366,7 @@ onMounted(load);
           v-model="d.on"
           type="checkbox"
           class="form-check-input condense__check"
+          title="Keep this proposal"
         />
         <div class="flex-grow-1">
           <textarea
@@ -388,11 +399,17 @@ onMounted(load);
         type="button"
         class="a-btn a-btn--primary"
         :disabled="!accepted.length || loading"
+        title="Put the ticked proposals into the entry's Condensed section (save the entry to keep them)"
         @click="accept"
       >
         Add {{ accepted.length || "" }} for {{ forName }}
       </button>
-      <button type="button" class="a-btn" @click="emit('cancel')">
+      <button
+        type="button"
+        class="a-btn"
+        title="Close without adding anything"
+        @click="emit('cancel')"
+      >
         Cancel
       </button>
     </div>
